@@ -19,10 +19,43 @@
 #include <netdb.h>
 #include <pthread.h>
 
-#define PORT 5555
+#include "rtp.h"
+
 #define hostNameLength 50
-#define messageLength  256
+#define messageLength 256
+
+int makeSocket(unsigned int port) {
+    int sock;
+
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if(sock < 0) {
+        perror("Could not create a socket\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return sock;
+}
 
 int main (int argc, const char *argv[]){
+    int sock;
+    struct sockaddr_in serverName;
+    char hostName[hostNameLength];
+
+    /* Check arguments */
+    if(argv[1] == NULL) {
+        perror("Usage: client [host name]\n");
+        exit(EXIT_FAILURE);
+    }
+    else {
+        strncpy(hostName, argv[1], hostNameLength);
+        hostName[hostNameLength - 1] = '\0';
+    }
+
+
+    /* Create the socket */
+    sock = makeSocket(PORT);
+    /* Initialize the socket address */
+    initSocketAddress(&serverName, hostName, PORT);
+
     return EXIT_SUCCESS;
 }

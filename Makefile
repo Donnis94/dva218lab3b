@@ -5,7 +5,7 @@ PROGRAMS = client server
 ALL: ${PROGRAMS}
 
 client: client.c
-	${CC} ${CFLAGS} -o client client.c -lpthread
+	${CC} ${CFLAGS} -o client client.c rtp.c -lpthread
 	
 
 server: server.c
