@@ -23,7 +23,6 @@
 #define hostNameLength 50
 #define messageLength  256
 
-
 int main (int argc, const char *argv[]){
-
+    return EXIT_SUCCESS;
 }
