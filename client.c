@@ -33,6 +33,12 @@ int makeSocket(TransimssionInfo *ti, char* hostName) {
 	
 	// Create socket
 	ti->socket = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (ti->socket == -1) {
+        printf("socket error\n");
+        exit(1);
+    }
+
 	return 0;
 }
 
@@ -52,6 +58,50 @@ int main (int argc, const char *argv[]){
 
     makeSocket(&ti, hostName);
 
+    initState(&ti);
 
     return EXIT_SUCCESS;
+}
+
+void initState(TransimssionInfo *transmissionInfo) {
+  int state = WAIT_SYN;
+  rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
+
+  while (1) {
+
+    int res = getData(transmissionInfo, frame);
+
+    printf("%d", res);
+
+    if (res == -1) {
+      perror("Error: ");
+      printf("\n");
+    }
+
+    switch (state)
+    {
+    case INIT:
+      frame->flags = SYN;
+      sendData(transmissionInfo, frame);
+      state = WAIT_SYNACK;
+
+      break;
+
+    case WAIT_SYN:      
+      break;
+
+    case WAIT_SYNACK:
+      /* code */
+      break;
+
+    case WAIT_ACK:
+      /* code */
+      break;
+    
+    default:
+      break;
+    }
+
+    sleep(1);
+  }
 }

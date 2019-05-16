@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <errno.h>
 
 #include "rtp.h"
 
@@ -30,6 +31,11 @@ void makeSocket(TransimssionInfo *ti) {
 	
 	//make a socket
 	ti->socket = socket (AF_INET, SOCK_DGRAM, 0);
+
+  if (ti->socket == -1) {
+    printf("socket error\n");
+    exit(1);
+  }
 	
 	//bind socket to address as given by the host struct in the TCB	
 	bind(ti->socket, (struct sockaddr *) &ti->host, sizeof(ti->host));
@@ -49,12 +55,18 @@ int main(int argc, const char *argv[]) {
 
 void initState(TransimssionInfo *transmissionInfo) {
   int state = WAIT_SYN;
-  rtp_h *frame;
+  rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
   while (1) {
 
     int res = getData(transmissionInfo, frame);
-    printf("res: %d", res);
+
+    printf("%d", res);
+
+    if (res == -1) {
+      perror("Error: ");
+      printf("\n");
+    }
 
     switch (state)
     {
@@ -65,11 +77,12 @@ void initState(TransimssionInfo *transmissionInfo) {
     case WAIT_SYN:
       
       if (frame->flags == SYN) {
-        printf("Received SYN");
         frame->flags = SYN+ACK;
         sendData(transmissionInfo, frame);
-        state = WAIT_ACK;
+        printf("Received SYN");
+        state = WAIT_SYNACK;
       }
+
       
       break;
 
@@ -84,5 +97,7 @@ void initState(TransimssionInfo *transmissionInfo) {
     default:
       break;
     }
+
+    sleep(1);
   }
 }

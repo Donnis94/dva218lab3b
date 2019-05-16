@@ -1,7 +1,7 @@
 #define PORT 5555
 #define DST "127.0.0.1"
 
-#define FRAME_SIZE 512
+#define FRAME_SIZE 544
 
 #define INIT 0
 #define WAIT_SYN 1

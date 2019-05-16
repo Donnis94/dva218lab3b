@@ -12,7 +12,8 @@
 #include "rtp.h"
 
 int getData(TransimssionInfo *ti, rtp_h *frame) {
-    return recvfrom(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, sizeof(ti->dest));
+    socklen_t len = sizeof(&ti->dest);
+    return recvfrom(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, &len);
 }
 
 int sendData(TransimssionInfo *ti, rtp_h *frame) {
