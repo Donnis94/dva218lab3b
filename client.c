@@ -24,21 +24,20 @@
 #define hostNameLength 50
 #define messageLength 256
 
-int makeSocket(unsigned int port) {
-    int sock;
-
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if(sock < 0) {
-        perror("Could not create a socket\n");
-        exit(EXIT_FAILURE);
-    }
-
-    return sock;
+int makeSocket(TransimssionInfo *ti, char* hostName) {	
+	struct hostent *hostInfo;
+	hostInfo = gethostbyname(hostName);
+	ti->dest.sin_family = AF_INET;
+	ti->dest.sin_port = htons(PORT);
+	ti->dest.sin_addr = *(struct in_addr *)hostInfo->h_addr_list[0];
+	
+	// Create socket
+	ti->socket = socket(AF_INET, SOCK_DGRAM, 0);
+	return 0;
 }
 
 int main (int argc, const char *argv[]){
-    int sock;
-    struct sockaddr_in serverName;
+    TransimssionInfo ti;
     char hostName[hostNameLength];
 
     /* Check arguments */
@@ -51,11 +50,8 @@ int main (int argc, const char *argv[]){
         hostName[hostNameLength - 1] = '\0';
     }
 
+    makeSocket(&ti, hostName);
 
-    /* Create the socket */
-    sock = makeSocket(PORT);
-    /* Initialize the socket address */
-    initSocketAddress(&serverName, hostName, PORT);
 
     return EXIT_SUCCESS;
 }

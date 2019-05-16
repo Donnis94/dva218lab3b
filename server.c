@@ -23,55 +23,66 @@
 #define PORT 5555
 #define MAXMSG 512
 
-int makeSocket(unsigned short int port) {
-  int sock;
-  struct sockaddr_in name;
-
-  /* Create a socket. */
-  sock = socket(PF_INET, SOCK_STREAM, 0);
-  if(sock < 0) {
-    perror("Could not create a socket\n");
-    exit(EXIT_FAILURE);
-  }
-  /* Give the socket a name. */
-  /* Socket address format set to AF_INET for Internet use. */
-  name.sin_family = AF_INET;
-  /* Set port number. The function htons converts from host byte order to network byte order.*/
-  name.sin_port = htons(port);
-  /* Set the Internet address of the host the function is called from. */
-  /* The function htonl converts INADDR_ANY from host byte order to network byte order. */
-  /* (htonl does the same thing as htons but the former converts a long integer whereas
-   * htons converts a short.) 
-   */
-  name.sin_addr.s_addr = htonl(INADDR_ANY);
-  /* Assign an address to the socket by calling bind. */
-  if(bind(sock, (struct sockaddr *)&name, sizeof(name)) < 0) {
-    perror("Could not bind a name to the socket\n");
-    exit(EXIT_FAILURE);
-  }
-  return(sock);
+void makeSocket(TransimssionInfo *ti) {
+	ti->host.sin_family = AF_INET;
+	ti->host.sin_port = htons(PORT);
+	ti->host.sin_addr.s_addr = htonl(INADDR_ANY);
+	
+	//make a socket
+	ti->socket = socket (AF_INET, SOCK_DGRAM, 0);
+	
+	//bind socket to address as given by the host struct in the TCB	
+	bind(ti->socket, (struct sockaddr *) &ti->host, sizeof(ti->host));
 }
 
 int main(int argc, const char *argv[]) {
-    int sock;
-    int i;
-    struct sockaddr_in dest_addr;
-    socklen_t size;
+    TransimssionInfo transmissionInfo;
   
  
-    /* Create a socket and set it up to accept connections */
-    sock = makeSocket(PORT);
-
-    if ( bind(sock, (const struct sockaddr *)&dest_addr,  
-            sizeof(dest_addr)) < 0 )
-    { 
-        perror("bind failed"); 
-        exit(EXIT_FAILURE); 
-    }
-
-    rtp_h *data = malloc(sizeof(rtp_h));
-    data->flags = WAIT_SYN;
-    sendto(sock,&data,sizeof(data),0,(struct sockaddr *)&dest_addr,sizeof(dest_addr));
+    /* Create a socket */
+    makeSocket(&transmissionInfo);
+  
+    initState(&transmissionInfo);
 
     return EXIT_SUCCESS;
+}
+
+void initState(TransimssionInfo *transmissionInfo) {
+  int state = WAIT_SYN;
+  rtp_h *frame;
+
+  while (1) {
+
+    int res = getData(transmissionInfo, frame);
+    printf("res: %d", res);
+
+    switch (state)
+    {
+    case INIT:
+      /* code */
+      break;
+
+    case WAIT_SYN:
+      
+      if (frame->flags == SYN) {
+        printf("Received SYN");
+        frame->flags = SYN+ACK;
+        sendData(transmissionInfo, frame);
+        state = WAIT_ACK;
+      }
+      
+      break;
+
+    case WAIT_SYNACK:
+      /* code */
+      break;
+
+    case WAIT_ACK:
+      /* code */
+      break;
+    
+    default:
+      break;
+    }
+  }
 }
