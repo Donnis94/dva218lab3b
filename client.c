@@ -18,90 +18,103 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <fcntl.h>
 
 #include "rtp.h"
 
 #define hostNameLength 50
 #define messageLength 256
 
-int makeSocket(TransimssionInfo *ti, char* hostName) {	
+TransmissionInfo *transmissionInfo;
+
+
+int makeSocket(char* hostName) {	
 	struct hostent *hostInfo;
 	hostInfo = gethostbyname(hostName);
-	ti->dest.sin_family = AF_INET;
-	ti->dest.sin_port = htons(PORT);
-	ti->dest.sin_addr = *(struct in_addr *)hostInfo->h_addr_list[0];
+	transmissionInfo->dest.sin_family = AF_INET;
+	transmissionInfo->dest.sin_port = htons(PORT);
+	transmissionInfo->dest.sin_addr = *(struct in_addr *)hostInfo->h_addr_list[0];
 	
 	// Create socket
-	ti->socket = socket(AF_INET, SOCK_DGRAM, 0);
+	transmissionInfo->socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
 
-    if (ti->socket == -1) {
-        printf("socket error\n");
-        exit(1);
-    }
+  if (transmissionInfo->socket == -1) {
+      printf("socket error\n");
+      exit(1);
+  }
+
+  int flags = (flags & ~O_NONBLOCK);
+  fcntl(transmissionInfo->socket, F_SETFL, flags);
 
 	return 0;
 }
 
 int main (int argc, const char *argv[]){
-    TransimssionInfo ti;
-    char hostName[hostNameLength];
+  char hostName[hostNameLength];
+  transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
 
-    /* Check arguments */
-    if(argv[1] == NULL) {
-        perror("Usage: client [host name]\n");
-        exit(EXIT_FAILURE);
-    }
-    else {
-        strncpy(hostName, argv[1], hostNameLength);
-        hostName[hostNameLength - 1] = '\0';
-    }
+  /* Check arguments */
+  if(argv[1] == NULL) {
+      perror("Usage: client [host name]\n");
+      exit(EXIT_FAILURE);
+  }
+  else {
+      strncpy(hostName, argv[1], hostNameLength);
+      hostName[hostNameLength - 1] = '\0';
+  }
 
-    makeSocket(&ti, hostName);
+  makeSocket(hostName);
 
-    initState(&ti);
+  initState();
 
-    return EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
-void initState(TransimssionInfo *transmissionInfo) {
-  int state = WAIT_SYN;
+void initState() {
+  int state = INIT;
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
   while (1) {
 
-    int res = getData(transmissionInfo, frame);
+    if (state != INIT) {
+      int res = getData(transmissionInfo, frame);
 
-    printf("%d", res);
-
-    if (res == -1) {
-      perror("Error: ");
-      printf("\n");
+      if (res == -1) {
+        perror("Error: ");
+        printf("\n");
+      }
     }
+    
 
     switch (state)
     {
     case INIT:
       frame->flags = SYN;
       sendData(transmissionInfo, frame);
+      printf("Sending SYN...\n");
       state = WAIT_SYNACK;
 
       break;
 
-    case WAIT_SYN:      
-      break;
-
     case WAIT_SYNACK:
-      /* code */
+      if (frame->flags == SYN+ACK) {
+        printf("Received SYN+ACK\n");
+        frame->flags = ACK;
+        sendData(transmissionInfo, frame);
+        printf("Sending ACK...\n");
+        state = ESTABLISHED;
+      }
       break;
 
-    case WAIT_ACK:
-      /* code */
-      break;
+    case ESTABLISHED:
+       printf("Established\n");
+       break;
     
     default:
+      // if (state == WAIT_ACK) {
+      //   sendData(transmissionInfo, frame);
+      // }
       break;
     }
-
-    sleep(1);
   }
 }

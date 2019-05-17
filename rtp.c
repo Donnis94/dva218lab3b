@@ -11,12 +11,12 @@
 
 #include "rtp.h"
 
-int getData(TransimssionInfo *ti, rtp_h *frame) {
+int getData(TransmissionInfo *ti, rtp_h *frame) {
     socklen_t len = sizeof(&ti->dest);
     return recvfrom(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, &len);
 }
 
-int sendData(TransimssionInfo *ti, rtp_h *frame) {
+int sendData(TransmissionInfo *ti, rtp_h *frame) {
     int res;
     socklen_t peer_addr_len;
 	  peer_addr_len = sizeof(struct sockaddr_storage);

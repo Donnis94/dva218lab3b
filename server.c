@@ -18,42 +18,46 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "rtp.h"
 
 #define PORT 5555
 #define MAXMSG 512
 
-void makeSocket(TransimssionInfo *ti) {
-	ti->host.sin_family = AF_INET;
-	ti->host.sin_port = htons(PORT);
-	ti->host.sin_addr.s_addr = htonl(INADDR_ANY);
+TransmissionInfo *transmissionInfo;
+
+void makeSocket() {
+	transmissionInfo->host.sin_family = AF_INET;
+	transmissionInfo->host.sin_port = htons(PORT);
+	transmissionInfo->host.sin_addr.s_addr = htonl(INADDR_ANY);
 	
 	//make a socket
-	ti->socket = socket (AF_INET, SOCK_DGRAM, 0);
+	transmissionInfo->socket = socket (AF_INET, SOCK_DGRAM, 0);
 
-  if (ti->socket == -1) {
+  if (transmissionInfo->socket == -1) {
     printf("socket error\n");
     exit(1);
   }
+
+  int flags = (flags & ~O_NONBLOCK);
+  fcntl(transmissionInfo->socket, F_SETFL, flags);
 	
 	//bind socket to address as given by the host struct in the TCB	
-	bind(ti->socket, (struct sockaddr *) &ti->host, sizeof(ti->host));
+	bind(transmissionInfo->socket, (struct sockaddr *) &transmissionInfo->host, sizeof(transmissionInfo->host));
 }
 
-int main(int argc, const char *argv[]) {
-    TransimssionInfo transmissionInfo;
-  
- 
+int main(int argc, const char *argv[]) { 
+    transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
     /* Create a socket */
-    makeSocket(&transmissionInfo);
+    makeSocket();
   
-    initState(&transmissionInfo);
+    initState();
 
     return EXIT_SUCCESS;
 }
 
-void initState(TransimssionInfo *transmissionInfo) {
+void initState() {
   int state = WAIT_SYN;
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
@@ -61,7 +65,8 @@ void initState(TransimssionInfo *transmissionInfo) {
 
     int res = getData(transmissionInfo, frame);
 
-    printf("%d", res);
+    printf("%d\n", res);
+    fflush(stdout);
 
     if (res == -1) {
       perror("Error: ");
@@ -70,34 +75,30 @@ void initState(TransimssionInfo *transmissionInfo) {
 
     switch (state)
     {
-    case INIT:
-      /* code */
-      break;
 
     case WAIT_SYN:
       
       if (frame->flags == SYN) {
         frame->flags = SYN+ACK;
         sendData(transmissionInfo, frame);
-        printf("Received SYN");
-        state = WAIT_SYNACK;
+        printf("Received SYN\n");
+        state = WAIT_ACK;
       }
-
-      
-      break;
-
-    case WAIT_SYNACK:
-      /* code */
       break;
 
     case WAIT_ACK:
-      /* code */
+      if (frame->flags == ACK) {
+        printf("ACK Received\n");
+        state = ESTABLISHED;
+      }
+      break;
+
+    case ESTABLISHED:
+      exit(0);
       break;
     
     default:
       break;
     }
-
-    sleep(1);
   }
 }

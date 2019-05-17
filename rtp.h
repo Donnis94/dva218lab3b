@@ -8,6 +8,8 @@
 #define WAIT_SYNACK 2
 #define WAIT_ACK 3
 
+#define ESTABLISHED 1337
+
 #define SYN 420
 #define ACK 421
 #define FIN 422
@@ -32,7 +34,8 @@ typedef struct {
     struct sockaddr_in host;
     struct sockaddr_in dest;
     int socket;
-} TransimssionInfo;
+} TransmissionInfo;
 
-int getData(TransimssionInfo *ti, rtp_h *frame);
-int sendData(TransimssionInfo *ti, rtp_h *frame);
+int getData(TransmissionInfo *ti, rtp_h *frame);
+int sendData(TransmissionInfo *ti, rtp_h *frame);
+void initState();
