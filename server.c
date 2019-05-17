@@ -28,9 +28,10 @@
 TransmissionInfo *transmissionInfo;
 void serverTeardown(rtp_h* frame, int state){
   if (frame->flags == FIN){
+      while(1){
       frame->flags = FINACK;
       state = WAIT_ACK;
-      while(1){
+      
         switch (state)
         {
         case WAIT_ACK:
