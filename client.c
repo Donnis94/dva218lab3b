@@ -27,6 +27,54 @@
 
 TransmissionInfo *transmissionInfo;
 
+void mainMenu(){
+  int choice;
+  printf("Choose what to do:\n1.Recieve package\n2.Quit connection to server");
+  scanf("%d",&choice);
+  fflush(stdout);
+  switch(choice){
+
+    case 1:
+    break;
+    
+    case 2:
+    teardwon();
+    break;
+  }
+  
+}
+
+void teardown(){
+  int state = WAIT_FINACK;
+  rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
+
+  while (1) {  
+
+    frame->flags = FIN;
+    switch (state)
+    {
+    case WAIT_FINACK:
+      if (frame->flags == FINACK) {
+        printf("Received FIN+ACK\n");
+        frame->flags = ACK;
+        sendData(transmissionInfo, frame);
+        printf("Sending ACK...\n");
+        state = CLOSED;
+      }
+      break;
+
+    case CLOSED:
+       printf("You have disconnected\n");
+       return EXIT_SUCCESS;
+    
+    default:
+      // if (state == WAIT_ACK) {
+      //   sendData(transmissionInfo, frame);
+      // }
+      break;
+    }
+  }
+}
 
 int makeSocket(char* hostName) {	
 	struct hostent *hostInfo;
@@ -108,6 +156,7 @@ void initState() {
 
     case ESTABLISHED:
        printf("Established\n");
+       mainMenu();
        break;
     
     default:

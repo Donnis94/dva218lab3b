@@ -7,12 +7,15 @@
 #define WAIT_SYN 1
 #define WAIT_SYNACK 2
 #define WAIT_ACK 3
+#define WAIT_FINACK 4
+#define CLOSED 99
 
 #define ESTABLISHED 1337
 
 #define SYN 420
 #define ACK 421
 #define FIN 422
+#define FINACK 423
 
 typedef struct {
     int flags;

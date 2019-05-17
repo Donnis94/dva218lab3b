@@ -27,6 +27,8 @@
 
 TransmissionInfo *transmissionInfo;
 
+
+
 void makeSocket() {
 	transmissionInfo->host.sin_family = AF_INET;
 	transmissionInfo->host.sin_port = htons(PORT);
@@ -63,15 +65,24 @@ void initState() {
 
   while (1) {
 
-    int res = getData(transmissionInfo, frame);
-
-    printf("%d\n", res);
-    fflush(stdout);
-
-    if (res == -1) {
-      perror("Error: ");
-      printf("\n");
-    }
+    if (frame->flags == FIN){
+      frame->flags = FINACK;
+      state = WAIT_ACK;
+      switch (state)
+      {
+      case WAIT_ACK:
+      if (frame->flags == ACK) {
+        printf("ACK Received\n");
+        state = CLOSED;
+      }
+      break; 
+      case CLOSED:
+      return EXIT_SUCCESS;
+    
+      default:
+      break;
+      }
+    }  
 
     switch (state)
     {
@@ -94,7 +105,6 @@ void initState() {
       break;
 
     case ESTABLISHED:
-      exit(0);
       break;
     
     default:
