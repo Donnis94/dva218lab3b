@@ -42,3 +42,4 @@ typedef struct {
 int getData(TransmissionInfo *ti, rtp_h *frame);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
 void initState();
+void teardown();

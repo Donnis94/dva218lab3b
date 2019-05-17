@@ -26,7 +26,28 @@
 #define MAXMSG 512
 
 TransmissionInfo *transmissionInfo;
-
+void serverTeardown(rtp_h* frame, int state){
+  if (frame->flags == FIN){
+      frame->flags = FINACK;
+      state = WAIT_ACK;
+      while(1){
+        switch (state)
+        {
+        case WAIT_ACK:
+        if (frame->flags == ACK) {
+          printf("ACK Received\n");
+          state = CLOSED;
+        }
+        break; 
+        case CLOSED:
+        return EXIT_SUCCESS;
+      
+        default:
+        break;
+        }
+      }
+    }  
+}
 
 
 void makeSocket() {
@@ -65,25 +86,6 @@ void initState() {
 
   while (1) {
 
-    if (frame->flags == FIN){
-      frame->flags = FINACK;
-      state = WAIT_ACK;
-      switch (state)
-      {
-      case WAIT_ACK:
-      if (frame->flags == ACK) {
-        printf("ACK Received\n");
-        state = CLOSED;
-      }
-      break; 
-      case CLOSED:
-      return EXIT_SUCCESS;
-    
-      default:
-      break;
-      }
-    }  
-
     switch (state)
     {
 
@@ -105,6 +107,8 @@ void initState() {
       break;
 
     case ESTABLISHED:
+      if (frame->flags == FIN)
+      serverTeardown(frame,state);
       break;
     
     default:

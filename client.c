@@ -38,7 +38,7 @@ void mainMenu(){
     break;
     
     case 2:
-    teardwon();
+    teardown();
     break;
   }
   
