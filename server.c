@@ -26,28 +26,38 @@
 #define MAXMSG 512
 
 TransmissionInfo *transmissionInfo;
-void serverTeardown(rtp_h* frame, int state){
-  if (frame->flags == FIN){
-      while(1){
-      frame->flags = FINACK;
+
+void teardown() {
+  rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
+  int state = FIN;
+
+  while (1) {
+
+    if (state != FIN) {
+      getData(transmissionInfo, frame);
+    }
+
+    switch (state) {
+
+    case FIN:
+      printf("Sending FIN + ACK\n");
+      frame->flags = FIN + ACK;
+      sendData(transmissionInfo, frame);
       state = WAIT_ACK;
-      
-        switch (state)
-        {
-        case WAIT_ACK:
-        if (frame->flags == ACK) {
-          printf("ACK Received\n");
-          state = CLOSED;
-        }
-        break; 
-        case CLOSED:
-        return EXIT_SUCCESS;
-      
-        default:
-        break;
-        }
+      break;
+
+    case WAIT_ACK:
+      if (frame->flags == ACK) {
+        printf("ACK received, closing...\n");
+        exit(EXIT_SUCCESS);
       }
-    }  
+      break;
+    
+    default:
+      return;
+      break;
+    }
+  }
 }
 
 
@@ -64,7 +74,7 @@ void makeSocket() {
     exit(1);
   }
 
-  int flags = (flags & ~O_NONBLOCK);
+  int flags = (flags & O_NONBLOCK);
   fcntl(transmissionInfo->socket, F_SETFL, flags);
 	
 	//bind socket to address as given by the host struct in the TCB	
@@ -87,6 +97,8 @@ void initState() {
 
   while (1) {
 
+    getData(transmissionInfo, frame);
+
     switch (state)
     {
 
@@ -108,8 +120,11 @@ void initState() {
       break;
 
     case ESTABLISHED:
-      if (frame->flags == FIN)
-      serverTeardown(frame,state);
+      if (frame->flags == FIN) {
+        printf("\n\nFIN received, preparing to close...\n");
+        teardown();
+      }
+
       break;
     
     default:

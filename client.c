@@ -38,39 +38,50 @@ void mainMenu(){
     break;
     
     case 2:
+    printf("\n\nPreparing to close...\n");
     teardown();
     break;
   }
   
 }
 
-void teardown(){
-  int state = WAIT_FINACK;
+void teardown() {
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
+  frame->flags = FIN;
 
-  while (1) {  
+  int state = FIN;
 
-    frame->flags = FIN;
-    switch (state)
-    {
+  while (1) {
+
+    if (state == WAIT_FINACK) {
+      getData(transmissionInfo, frame);
+    }
+
+    switch (state) {
+
+    case FIN:
+      printf("Sending FIN\n");
+      frame->flags = FIN;
+      sendData(transmissionInfo, frame);
+      state = WAIT_FINACK;
+      break;
+
     case WAIT_FINACK:
-      if (frame->flags == FINACK) {
-        printf("Received FIN+ACK\n");
-        frame->flags = ACK;
-        sendData(transmissionInfo, frame);
-        printf("Sending ACK...\n");
-        state = CLOSED;
+      if (frame->flags == FIN + ACK) {
+        printf("Received FIN + ACK\n");
+        state = ACK;
       }
       break;
 
-    case CLOSED:
-       printf("You have disconnected\n");
-       return EXIT_SUCCESS;
+    case ACK:
+      printf("Sending ACK\n");
+      frame->flags = ACK;
+      sendData(transmissionInfo, frame);
+      exit(EXIT_SUCCESS);
+    break;
     
     default:
-      // if (state == WAIT_ACK) {
-      //   sendData(transmissionInfo, frame);
-      // }
+      return;
       break;
     }
   }
@@ -91,7 +102,7 @@ int makeSocket(char* hostName) {
       exit(1);
   }
 
-  int flags = (flags & ~O_NONBLOCK);
+  int flags = (flags & O_NONBLOCK);
   fcntl(transmissionInfo->socket, F_SETFL, flags);
 
 	return 0;
@@ -124,7 +135,7 @@ void initState() {
 
   while (1) {
 
-    if (state != INIT) {
+    if (state != INIT && state != ESTABLISHED) {
       int res = getData(transmissionInfo, frame);
 
       if (res == -1) {

@@ -15,7 +15,6 @@
 #define SYN 420
 #define ACK 421
 #define FIN 422
-#define FINACK 423
 
 typedef struct {
     int flags;
