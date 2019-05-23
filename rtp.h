@@ -1,6 +1,8 @@
 #define PORT 5555
 #define DST "127.0.0.1"
 
+#define WINDOW_SIZE 5
+
 #define FRAME_SIZE 544
 #define DATA_SIZE 512
 
@@ -35,6 +37,8 @@ typedef struct
 
 typedef struct {
     int seq;
+    int next;
+    int window_size;
 } Variables;
 
 typedef struct {
@@ -50,3 +54,6 @@ int getData(TransmissionInfo *ti, rtp_h *frame);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
 void initState();
 void teardown();
+
+void incrementSeq(TransmissionInfo *transmissionInfo);
+int getSeq(TransmissionInfo *transmissionInfo);

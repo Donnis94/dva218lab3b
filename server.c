@@ -111,28 +111,35 @@ void initState() {
     case WAIT_SYN:
       
       if (frame->flags == SYN) {
-        makePacket(frame, transmissionInfo->s_vars.seq, SYN + ACK, 0);
+
+        printf("Received SYN, SEQ = %d\n", frame->seq);
+
+        makePacket(frame, frame->seq, SYN + ACK, 0);
+        printf("Sending ACK, SEQ = %d\n", frame->seq);
+
         sendData(transmissionInfo, frame);
-        printf("Received SYN\n");
         state = WAIT_ACK;
       }
       break;
 
     case WAIT_ACK:
       if (frame->flags == ACK) {
-        printf("ACK Received\n");
+        printf("ACK Received, SEQ = %d\n", frame->seq);
         state = ESTABLISHED;
       }
       break;
 
     case ESTABLISHED:
       if (frame->flags == FIN) {
-        printf("\n\nFIN received, preparing to close...\n");
         teardown();
       }
 
-      printf("here is paket %d big\n", res);
-      printf("Packet received: SEQ = %d, data = %s\n", frame->seq, frame->data);
+      printf("Packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+
+      printf("Sending ACK, SEQ = %d\n", frame->seq);
+
+      makePacket(frame, frame->seq, ACK, 0);
+      sendData(transmissionInfo, frame);
 
       break;
     

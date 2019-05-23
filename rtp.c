@@ -35,44 +35,22 @@ int getData(TransmissionInfo *ti, rtp_h *frame) {
 int sendData(TransmissionInfo *ti, rtp_h *frame) {
     int res;
     socklen_t peer_addr_len;
-	  peer_addr_len = sizeof(struct sockaddr_storage);
-
+	peer_addr_len = sizeof(struct sockaddr_storage);
+    
     res = sendto(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, peer_addr_len);
     return res;
 }
 
-// void state(int sock) {
-//     rtp_h event;
-//     event = getData(sock);
-//     printf("%d", event.flags);
+void incrementSeq(TransmissionInfo *transmissionInfo) {
+    transmissionInfo->s_vars.seq = transmissionInfo->s_vars.seq + 1;
+}
 
-//     while(1) {
-//         switch (state)
-//         {
-//         case INIT:
-//             if (event == send_data) {
-//                 state = WAIT_ACK;
-//                 send (DATA_TO_RECEIVER);
-//             }
-//             break;
-        
-//         case WAIT_SYN:
-//             if (event == got_syn) {
-//                 state = WAIT_ACK;
-//                 send (SYNC_ACK_TO_SENDER);
-//             }
-//             break;
+int getSeq(TransmissionInfo *transmissionInfo) {
+    return transmissionInfo->s_vars.seq;
+}
 
-//         case WAIT_SYNACK:
-//             break;
-
-//         case WAIT_ACK:
-//             break;
-
-//         default:
-//             if (state == WAIT_ACK)
-//                 resend (DATA_TO_SERVER);
-//             break;
-//         }
-//     }
-// }
+void initQueue(queue* q, int len) {
+    q->queue = (rtp_h*)malloc(len * sizeof(rtp_h));
+    q->size = len;
+    q->count = 0;
+}

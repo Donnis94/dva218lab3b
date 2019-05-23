@@ -29,7 +29,7 @@ TransmissionInfo *transmissionInfo;
 
 void mainMenu(){
   int choice;
-  printf("Choose what to do:\n1.Recieve package\n2.Quit connection to server");
+  printf("Choose what to do:\n1.Recieve package\n2.Quit connection to server\nInput: ");
   scanf("%d",&choice);
   fflush(stdout);
   switch(choice){
@@ -150,32 +150,43 @@ void initState() {
     switch (state)
     {
     case INIT:
-      makePacket(frame, transmissionInfo->s_vars.seq, SYN, 0);
+      makePacket(frame, getSeq(transmissionInfo), SYN, 0);
       sendData(transmissionInfo, frame);
-      printf("Sending SYN...\n");
+      printf("Sending SYN, SEQ = %d...\n", getSeq(transmissionInfo));
       state = WAIT_SYNACK;
 
       break;
 
     case WAIT_SYNACK:
       if (frame->flags == SYN+ACK) {
-        printf("Received SYN+ACK\n");
+
+        printf("Received SYN+ACK, SEQ = %d\n", frame->seq);
         makePacket(frame, frame->seq, ACK, 0);
         sendData(transmissionInfo, frame);
-        printf("Sending ACK...\n");
+        printf("Sending ACK for SEQ = %d...\n", frame->seq);
+        frame->flags = 0;
         state = ESTABLISHED;
       }
     break;
 
     case ESTABLISHED:
-      printf("Established\n");
+
+      printf("\n\n");
       mainMenu();
+      printf("\n\n");
 
       char * buffer = (char*)malloc(DATA_SIZE);
       strncpy(buffer, "guten tag\0", DATA_SIZE);
 
-      makePacket(frame, transmissionInfo->s_vars.seq, 0, buffer);
+      if (frame->flags == ACK) {
+        printf("Received ACK, SEQ = %d\n", frame->seq);
+      }
+
+      incrementSeq(transmissionInfo);
+
+      makePacket(frame, getSeq(transmissionInfo), 0, buffer);
       sendData(transmissionInfo, frame);
+      printf("Sent packet, SEQ = %d, data = %s\n", getSeq(transmissionInfo), frame->data);
       break;
     
     default:
