@@ -2,6 +2,7 @@
 #define DST "127.0.0.1"
 
 #define FRAME_SIZE 544
+#define DATA_SIZE 512
 
 #define INIT 0
 #define WAIT_SYN 1
@@ -22,7 +23,7 @@ typedef struct {
     int seq;
     int windowsize;
     int crc;
-    char *data;
+    char data[DATA_SIZE];
 } rtp_h;
 
 typedef struct
@@ -33,11 +34,18 @@ typedef struct
 } queue;
 
 typedef struct {
+    int seq;
+} Variables;
+
+typedef struct {
     struct sockaddr_in host;
     struct sockaddr_in dest;
+    Variables s_vars;
+    Variables r_vars;
     int socket;
 } TransmissionInfo;
 
+void makePacket(rtp_h *frame, int seqNr, int flag, char* data);
 int getData(TransmissionInfo *ti, rtp_h *frame);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
 void initState();

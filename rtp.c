@@ -11,6 +11,22 @@
 
 #include "rtp.h"
 
+void makePacket(rtp_h *frame, int seqNr, int flag, char* data) {
+    frame->seq = seqNr;
+    
+    frame->crc = 0;
+
+
+    if (flag != 0) {
+        frame->flags = flag;
+        memset(frame->data, 0, DATA_SIZE);
+    } else {
+        frame->flags = 0;
+        memset(frame->data, 0, DATA_SIZE);
+        memcpy(frame->data, data, strlen(data));
+    }
+}
+
 int getData(TransmissionInfo *ti, rtp_h *frame) {
     socklen_t len = sizeof(&ti->dest);
     return recvfrom(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, &len);
@@ -22,7 +38,6 @@ int sendData(TransmissionInfo *ti, rtp_h *frame) {
 	  peer_addr_len = sizeof(struct sockaddr_storage);
 
     res = sendto(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, peer_addr_len);
-
     return res;
 }
 

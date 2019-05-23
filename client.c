@@ -35,12 +35,12 @@ void mainMenu(){
   switch(choice){
 
     case 1:
-    break;
+      break;
     
     case 2:
-    printf("\n\nPreparing to close...\n");
-    teardown();
-    break;
+      printf("\n\nPreparing to close...\n");
+      teardown();
+      break;
   }
   
 }
@@ -61,7 +61,7 @@ void teardown() {
 
     case FIN:
       printf("Sending FIN\n");
-      frame->flags = FIN;
+      makePacket(frame, transmissionInfo->s_vars.seq, FIN, 0);
       sendData(transmissionInfo, frame);
       state = WAIT_FINACK;
       break;
@@ -75,7 +75,7 @@ void teardown() {
 
     case ACK:
       printf("Sending ACK\n");
-      frame->flags = ACK;
+      makePacket(frame, transmissionInfo->s_vars.seq, ACK, 0);
       sendData(transmissionInfo, frame);
       exit(EXIT_SUCCESS);
     break;
@@ -96,6 +96,8 @@ int makeSocket(char* hostName) {
 	
 	// Create socket
 	transmissionInfo->socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+
+  transmissionInfo->s_vars.seq = 0;
 
   if (transmissionInfo->socket == -1) {
       printf("socket error\n");
@@ -148,7 +150,7 @@ void initState() {
     switch (state)
     {
     case INIT:
-      frame->flags = SYN;
+      makePacket(frame, transmissionInfo->s_vars.seq, SYN, 0);
       sendData(transmissionInfo, frame);
       printf("Sending SYN...\n");
       state = WAIT_SYNACK;
@@ -158,17 +160,23 @@ void initState() {
     case WAIT_SYNACK:
       if (frame->flags == SYN+ACK) {
         printf("Received SYN+ACK\n");
-        frame->flags = ACK;
+        makePacket(frame, frame->seq, ACK, 0);
         sendData(transmissionInfo, frame);
         printf("Sending ACK...\n");
         state = ESTABLISHED;
       }
-      break;
+    break;
 
     case ESTABLISHED:
-       printf("Established\n");
-       mainMenu();
-       break;
+      printf("Established\n");
+      mainMenu();
+
+      char * buffer = (char*)malloc(DATA_SIZE);
+      strncpy(buffer, "guten tag\0", DATA_SIZE);
+
+      makePacket(frame, transmissionInfo->s_vars.seq, 0, buffer);
+      sendData(transmissionInfo, frame);
+      break;
     
     default:
       // if (state == WAIT_ACK) {

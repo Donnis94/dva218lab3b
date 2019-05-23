@@ -41,7 +41,7 @@ void teardown() {
 
     case FIN:
       printf("Sending FIN + ACK\n");
-      frame->flags = FIN + ACK;
+      makePacket(frame, transmissionInfo->s_vars.seq, FIN + ACK, 0);
       sendData(transmissionInfo, frame);
       state = WAIT_ACK;
       break;
@@ -68,6 +68,8 @@ void makeSocket() {
 	
 	//make a socket
 	transmissionInfo->socket = socket (AF_INET, SOCK_DGRAM, 0);
+
+  transmissionInfo->s_vars.seq = 0;
 
   if (transmissionInfo->socket == -1) {
     printf("socket error\n");
@@ -97,7 +99,11 @@ void initState() {
 
   while (1) {
 
-    getData(transmissionInfo, frame);
+    int res = getData(transmissionInfo, frame);
+
+    if (res == -1) {
+        printf("fak");
+    }
 
     switch (state)
     {
@@ -105,7 +111,7 @@ void initState() {
     case WAIT_SYN:
       
       if (frame->flags == SYN) {
-        frame->flags = SYN+ACK;
+        makePacket(frame, transmissionInfo->s_vars.seq, SYN + ACK, 0);
         sendData(transmissionInfo, frame);
         printf("Received SYN\n");
         state = WAIT_ACK;
@@ -124,6 +130,9 @@ void initState() {
         printf("\n\nFIN received, preparing to close...\n");
         teardown();
       }
+
+      printf("here is paket %d big\n", res);
+      printf("Packet received: SEQ = %d, data = %s\n", frame->seq, frame->data);
 
       break;
     
