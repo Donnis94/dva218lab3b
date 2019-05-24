@@ -1,3 +1,15 @@
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <sys/select.h>
+
 #define PORT 5555
 #define DST "127.0.0.1"
 
@@ -19,9 +31,16 @@
 #define ACK 421
 #define FIN 422
 
+enum QueueType {
+    SENT,
+    RECEIVED,
+    ACKNOWLEDGEMENT
+};
+
 typedef struct {
     int flags;
     int id;
+    int ack; // Which sequence number are we ACKing
     int seq;
     int windowsize;
     int crc;
@@ -35,25 +54,33 @@ typedef struct
 	int count;
 } queue;
 
-typedef struct {
-    int seq;
-    int next;
+typedef struct Variables {
+    int is; // initial sequence
+    int oldest; // oldest unacked packet
+    int next; // next expected (if frame->flags < next => old packet)
     int window_size;
 } Variables;
 
 typedef struct {
     struct sockaddr_in host;
     struct sockaddr_in dest;
-    Variables s_vars;
-    Variables r_vars;
+    struct Variables s_vars;
+    struct Variables r_vars;
     int socket;
 } TransmissionInfo;
 
-void makePacket(rtp_h *frame, int seqNr, int flag, char* data);
-int getData(TransmissionInfo *ti, rtp_h *frame);
+int randomSeq();
+void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data);
+int getData(TransmissionInfo *ti, rtp_h *frame, int timeout);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
 void initState();
 void teardown();
 
-void incrementSeq(TransmissionInfo *transmissionInfo);
-int getSeq(TransmissionInfo *transmissionInfo);
+void initQueue(queue* q, int len);
+void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h *frame, enum QueueType type);
+rtp_h* dequeue(queue *q);
+int isQueueFull(queue *q);
+int isQueueEmpty(queue *q);
+
+// void incrementSeq(TransmissionInfo *transmissionInfo);
+// int getSeq(TransmissionInfo *transmissionInfo);

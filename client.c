@@ -26,10 +26,12 @@
 #define messageLength 256
 
 TransmissionInfo *transmissionInfo;
+queue sentQueue;
+queue ackQueue;
 
 void mainMenu(){
   int choice;
-  printf("Choose what to do:\n1.Recieve package\n2.Quit connection to server\nInput: ");
+  printf("Choose what to do:\n1.Send packet\n2.Quit connection to server\nInput: ");
   scanf("%d",&choice);
   fflush(stdout);
   switch(choice){
@@ -54,15 +56,16 @@ void teardown() {
   while (1) {
 
     if (state == WAIT_FINACK) {
-      getData(transmissionInfo, frame);
+      getData(transmissionInfo, frame, 1);
     }
 
     switch (state) {
 
     case FIN:
       printf("Sending FIN\n");
-      makePacket(frame, transmissionInfo->s_vars.seq, FIN, 0);
+      makePacket(frame, transmissionInfo->s_vars.next, 0, FIN, 0);
       sendData(transmissionInfo, frame);
+      transmissionInfo->s_vars.next++;
       state = WAIT_FINACK;
       break;
 
@@ -70,15 +73,14 @@ void teardown() {
       if (frame->flags == FIN + ACK) {
         printf("Received FIN + ACK\n");
         state = ACK;
+        printf("Sending ACK\n");
+        makePacket(frame, 0, frame->ack, ACK, 0);
+        sendData(transmissionInfo, frame);
+        transmissionInfo->s_vars.next++;
+
+        exit(EXIT_SUCCESS);
       }
       break;
-
-    case ACK:
-      printf("Sending ACK\n");
-      makePacket(frame, transmissionInfo->s_vars.seq, ACK, 0);
-      sendData(transmissionInfo, frame);
-      exit(EXIT_SUCCESS);
-    break;
     
     default:
       return;
@@ -95,17 +97,17 @@ int makeSocket(char* hostName) {
 	transmissionInfo->dest.sin_addr = *(struct in_addr *)hostInfo->h_addr_list[0];
 	
 	// Create socket
-	transmissionInfo->socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+	transmissionInfo->socket = socket(AF_INET, SOCK_DGRAM, 0);
+  transmissionInfo->s_vars.window_size = WINDOW_SIZE;
 
-  transmissionInfo->s_vars.seq = 0;
+  transmissionInfo->s_vars.is = randomSeq();
+  transmissionInfo->s_vars.next = transmissionInfo->s_vars.is;
+  transmissionInfo->s_vars.oldest = transmissionInfo->s_vars.is;
 
   if (transmissionInfo->socket == -1) {
       printf("socket error\n");
       exit(1);
   }
-
-  int flags = (flags & O_NONBLOCK);
-  fcntl(transmissionInfo->socket, F_SETFL, flags);
 
 	return 0;
 }
@@ -132,61 +134,73 @@ int main (int argc, const char *argv[]){
 }
 
 void initState() {
+  initQueue(&sentQueue, transmissionInfo->r_vars.window_size);
+  initQueue(&ackQueue, transmissionInfo->r_vars.window_size);
+
   int state = INIT;
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
   while (1) {
 
-    if (state != INIT && state != ESTABLISHED) {
-      int res = getData(transmissionInfo, frame);
-
-      if (res == -1) {
-        perror("Error: ");
-        printf("\n");
-      }
-    }
-    
+    getData(transmissionInfo, frame, 1);    
 
     switch (state)
     {
     case INIT:
-      makePacket(frame, getSeq(transmissionInfo), SYN, 0);
+      makePacket(frame, transmissionInfo->s_vars.is, 0, SYN, 0);
       sendData(transmissionInfo, frame);
-      printf("Sending SYN, SEQ = %d...\n", getSeq(transmissionInfo));
+      enqueue(transmissionInfo, &sentQueue, frame, SENT);
+
+      printf("Sending SYN, SEQ = %d\n", transmissionInfo->s_vars.is);
       state = WAIT_SYNACK;
 
       break;
 
     case WAIT_SYNACK:
       if (frame->flags == SYN+ACK) {
+        if (frame->ack == transmissionInfo->s_vars.is) {
+          // An ack has been received for our SYN.
+          // Increment oldest received
+          transmissionInfo->s_vars.oldest++;
+          transmissionInfo->r_vars.is = transmissionInfo->r_vars.next = frame->seq;
 
-        printf("Received SYN+ACK, SEQ = %d\n", frame->seq);
-        makePacket(frame, frame->seq, ACK, 0);
-        sendData(transmissionInfo, frame);
-        printf("Sending ACK for SEQ = %d...\n", frame->seq);
-        frame->flags = 0;
-        state = ESTABLISHED;
+          printf("Received SYN+ACK for SEQ = %d\n", frame->ack);
+
+          // ACK the sequence number
+          makePacket(frame, 0, transmissionInfo->r_vars.is, ACK, 0);
+          sendData(transmissionInfo, frame);
+   
+          printf("Sending ACK = %d...\n", frame->ack);
+          frame->flags = 0;
+          state = ESTABLISHED;
+        }        
       }
     break;
 
-    case ESTABLISHED:
+    case ESTABLISHED:      
+
+      if (frame->flags == ACK) {
+        // Received an ACK, increment oldest.
+        transmissionInfo->r_vars.oldest++;
+        printf("Received ACK for packet SEQ = %d\n", frame->ack);
+      }
 
       printf("\n\n");
+
       mainMenu();
       printf("\n\n");
 
       char * buffer = (char*)malloc(DATA_SIZE);
       strncpy(buffer, "guten tag\0", DATA_SIZE);
 
-      if (frame->flags == ACK) {
-        printf("Received ACK, SEQ = %d\n", frame->seq);
-      }
+      // incrementSeq(transmissionInfo);
 
-      incrementSeq(transmissionInfo);
-
-      makePacket(frame, getSeq(transmissionInfo), 0, buffer);
+      makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
       sendData(transmissionInfo, frame);
-      printf("Sent packet, SEQ = %d, data = %s\n", getSeq(transmissionInfo), frame->data);
+      printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
+      enqueue(transmissionInfo, &sentQueue, frame, SENT);
+      sleep(1);
+
       break;
     
     default:

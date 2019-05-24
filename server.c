@@ -26,6 +26,8 @@
 #define MAXMSG 512
 
 TransmissionInfo *transmissionInfo;
+queue readQueue;
+queue ackQueue;
 
 void teardown() {
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
@@ -34,14 +36,14 @@ void teardown() {
   while (1) {
 
     if (state != FIN) {
-      getData(transmissionInfo, frame);
+      getData(transmissionInfo, frame, 1);
     }
 
     switch (state) {
 
     case FIN:
       printf("Sending FIN + ACK\n");
-      makePacket(frame, transmissionInfo->s_vars.seq, FIN + ACK, 0);
+      makePacket(frame, transmissionInfo->s_vars.next, transmissionInfo->r_vars.next, FIN + ACK, 0);
       sendData(transmissionInfo, frame);
       state = WAIT_ACK;
       break;
@@ -68,16 +70,16 @@ void makeSocket() {
 	
 	//make a socket
 	transmissionInfo->socket = socket (AF_INET, SOCK_DGRAM, 0);
+  transmissionInfo->s_vars.window_size = WINDOW_SIZE;
 
-  transmissionInfo->s_vars.seq = 0;
+  transmissionInfo->s_vars.is = randomSeq();
+  transmissionInfo->s_vars.next = transmissionInfo->s_vars.is;
+  transmissionInfo->s_vars.oldest = transmissionInfo->s_vars.is;
 
   if (transmissionInfo->socket == -1) {
     printf("socket error\n");
     exit(1);
   }
-
-  int flags = (flags & O_NONBLOCK);
-  fcntl(transmissionInfo->socket, F_SETFL, flags);
 	
 	//bind socket to address as given by the host struct in the TCB	
 	bind(transmissionInfo->socket, (struct sockaddr *) &transmissionInfo->host, sizeof(transmissionInfo->host));
@@ -94,16 +96,15 @@ int main(int argc, const char *argv[]) {
 }
 
 void initState() {
+
+  initQueue(&readQueue, transmissionInfo->r_vars.window_size);
+  initQueue(&ackQueue, transmissionInfo->r_vars.window_size);
   int state = WAIT_SYN;
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
   while (1) {
 
-    int res = getData(transmissionInfo, frame);
-
-    if (res == -1) {
-        printf("fak");
-    }
+    getData(transmissionInfo, frame, 1);
 
     switch (state)
     {
@@ -113,9 +114,12 @@ void initState() {
       if (frame->flags == SYN) {
 
         printf("Received SYN, SEQ = %d\n", frame->seq);
+        
+        transmissionInfo->r_vars.is = frame->seq;
+        transmissionInfo->r_vars.next = transmissionInfo->r_vars.is + 1;
 
-        makePacket(frame, frame->seq, SYN + ACK, 0);
-        printf("Sending ACK, SEQ = %d\n", frame->seq);
+        makePacket(frame, transmissionInfo->s_vars.is, transmissionInfo->r_vars.is, SYN + ACK, 0);
+        printf("Sending ACK, SEQ = %d, ACK = %d\n", frame->seq, frame->ack);
 
         sendData(transmissionInfo, frame);
         state = WAIT_ACK;
@@ -124,22 +128,36 @@ void initState() {
 
     case WAIT_ACK:
       if (frame->flags == ACK) {
-        printf("ACK Received, SEQ = %d\n", frame->seq);
+        printf("ACK Received, SEQ = %d, ACK = %d\n", frame->seq, frame->ack);
         state = ESTABLISHED;
+        printf("ESTABLISHED\n");
       }
       break;
 
     case ESTABLISHED:
+      if (frame->flags == 0) {
+        // Old packet
+        if (frame->seq < transmissionInfo->r_vars.next) {
+          printf("Old packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+        }
+        // Expected packet
+        else if (frame->seq == transmissionInfo->r_vars.next) {
+          printf("Expected packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+          transmissionInfo->r_vars.next++;
+        }
+        // Future
+        else if (frame->seq > transmissionInfo->r_vars.next) {
+          printf("Future packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+        }
+
+        makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
+        printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
+        sendData(transmissionInfo, frame);
+      }
+
       if (frame->flags == FIN) {
         teardown();
       }
-
-      printf("Packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
-
-      printf("Sending ACK, SEQ = %d\n", frame->seq);
-
-      makePacket(frame, frame->seq, ACK, 0);
-      sendData(transmissionInfo, frame);
 
       break;
     
