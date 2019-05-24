@@ -1,7 +1,7 @@
 #include "rtp.h"
 
 int randomSeq() {
-    return rand();
+    return rand() % 1000;
 }
 
 void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data) {
@@ -55,20 +55,21 @@ int sendData(TransmissionInfo *ti, rtp_h *frame) {
 // }
 
 void initQueue(queue* q, int len) {
-    q->queue = calloc(len, sizeof(rtp_h));
+    q->queue = malloc(len * FRAME_SIZE);
     q->size = len;
     q->count = 0;
 }
 
-void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h *frame, enum QueueType type) {
+void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type) {
 
-    if (frame->seq == 0) {
+    if (frame.seq == 0) {
         printf("Error adding, SEQ == 0");
         exit(EXIT_FAILURE);
     }
 
-    memcpy(&q->queue[q->count * sizeof(rtp_h)], frame, sizeof(rtp_h));
-    q->count++;
+    int index = q->count * FRAME_SIZE;
+    memcpy((&q->queue[index]), &frame, FRAME_SIZE);
+    q->count++; //one more item in the queue
 
     switch (type) {
         case SENT:

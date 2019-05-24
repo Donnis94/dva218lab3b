@@ -77,7 +77,7 @@ void initState();
 void teardown();
 
 void initQueue(queue* q, int len);
-void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h *frame, enum QueueType type);
+void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type);
 rtp_h* dequeue(queue *q);
 int isQueueFull(queue *q);
 int isQueueEmpty(queue *q);

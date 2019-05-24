@@ -8,18 +8,6 @@
  * 
  */
 
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <pthread.h>
-#include <fcntl.h>
-
 #include "rtp.h"
 
 #define hostNameLength 50
@@ -115,7 +103,6 @@ int makeSocket(char* hostName) {
 int main (int argc, const char *argv[]){
   char hostName[hostNameLength];
   transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
-
   /* Check arguments */
   if(argv[1] == NULL) {
       perror("Usage: client [host name]\n");
@@ -128,17 +115,16 @@ int main (int argc, const char *argv[]){
 
   makeSocket(hostName);
 
+  initQueue(&sentQueue, transmissionInfo->r_vars.window_size);
+  initQueue(&ackQueue, transmissionInfo->r_vars.window_size);
   initState();
 
   return EXIT_SUCCESS;
 }
 
 void initState() {
-  initQueue(&sentQueue, transmissionInfo->r_vars.window_size);
-  initQueue(&ackQueue, transmissionInfo->r_vars.window_size);
-
   int state = INIT;
-  rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
+  rtp_h *frame = malloc(FRAME_SIZE);
 
   while (1) {
 
@@ -149,9 +135,9 @@ void initState() {
     case INIT:
       makePacket(frame, transmissionInfo->s_vars.is, 0, SYN, 0);
       sendData(transmissionInfo, frame);
-      enqueue(transmissionInfo, &sentQueue, frame, SENT);
+      enqueue(transmissionInfo, &sentQueue, *frame, SENT);
 
-      printf("Sending SYN, SEQ = %d\n", transmissionInfo->s_vars.is);
+      // printf("Sending SYN, SEQ = %d\n", frame->seq);
       state = WAIT_SYNACK;
 
       break;
@@ -198,9 +184,7 @@ void initState() {
       makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
       sendData(transmissionInfo, frame);
       printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
-      enqueue(transmissionInfo, &sentQueue, frame, SENT);
-      sleep(1);
-
+      enqueue(transmissionInfo, &sentQueue, *frame, SENT);
       break;
     
     default:
