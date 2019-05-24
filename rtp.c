@@ -78,6 +78,15 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
 
         case RECEIVED:
             // Check window size
+            for (int check = 0; check < q->count;check++){
+                int checkInd = check * FRAME_SIZE;
+                if (&q->queue[checkInd] == &frame){
+                    dequeue(q);
+                }
+                else {
+                    break;
+                }
+            }
             break;
 
         case ACKNOWLEDGEMENT:
