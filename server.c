@@ -97,8 +97,8 @@ int main(int argc, const char *argv[]) {
 
 void initState() {
 
-  initQueue(&readQueue, transmissionInfo->r_vars.window_size);
-  initQueue(&ackQueue, transmissionInfo->r_vars.window_size);
+  initQueue(&readQueue, transmissionInfo->s_vars.window_size);
+  initQueue(&ackQueue, transmissionInfo->s_vars.window_size);
   int state = WAIT_SYN;
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
@@ -143,11 +143,13 @@ void initState() {
         // Expected packet
         else if (frame->seq == transmissionInfo->r_vars.next) {
           printf("Expected packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+          enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
           transmissionInfo->r_vars.next++;
         }
         // Future
         else if (frame->seq > transmissionInfo->r_vars.next) {
           printf("Future packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+          enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
         }
 
         makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
@@ -164,5 +166,7 @@ void initState() {
     default:
       break;
     }
+
+    sleep(1);
   }
 }

@@ -115,8 +115,8 @@ int main (int argc, const char *argv[]){
 
   makeSocket(hostName);
 
-  initQueue(&sentQueue, transmissionInfo->r_vars.window_size);
-  initQueue(&ackQueue, transmissionInfo->r_vars.window_size);
+  initQueue(&sentQueue, transmissionInfo->s_vars.window_size);
+  initQueue(&ackQueue, transmissionInfo->s_vars.window_size);
   initState();
 
   return EXIT_SUCCESS;
@@ -137,7 +137,7 @@ void initState() {
       sendData(transmissionInfo, frame);
       enqueue(transmissionInfo, &sentQueue, *frame, SENT);
 
-      // printf("Sending SYN, SEQ = %d\n", frame->seq);
+      printf("Sending SYN, SEQ = %d\n", frame->seq);
       state = WAIT_SYNACK;
 
       break;
@@ -193,5 +193,7 @@ void initState() {
       // }
       break;
     }
+
+    sleep(1);
   }
 }

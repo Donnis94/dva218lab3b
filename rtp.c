@@ -55,7 +55,7 @@ int sendData(TransmissionInfo *ti, rtp_h *frame) {
 // }
 
 void initQueue(queue* q, int len) {
-    q->queue = malloc(len * FRAME_SIZE);
+    q->queue = calloc(len, sizeof(rtp_h));
     q->size = len;
     q->count = 0;
 }
@@ -67,21 +67,31 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
         exit(EXIT_FAILURE);
     }
 
-    int index = q->count * FRAME_SIZE;
-    memcpy((&q->queue[index]), &frame, FRAME_SIZE);
-    q->count++; //one more item in the queue
+    int index = q->count;
 
     switch (type) {
         case SENT:
+            memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
+            q->count++;
             transmissionInfo->s_vars.next++;
             break;
 
         case RECEIVED:
-            // Check window size
+            if (frame.seq >= transmissionInfo->r_vars.next && frame.seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->r_vars.next)){
+                memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
+                q->count++;
+            } else {
+                printf("Received packet outside window size. SEQ = %d", frame.seq);
+            }
             break;
 
         case ACKNOWLEDGEMENT:
-            // Check window size
+            if (frame.seq >= transmissionInfo->s_vars.oldest && frame.seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
+                memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
+                q->count++;
+            } else {
+                printf("Received packet outside window size. SEQ = %d", frame.seq);
+            }
             break;    
 
         default:
