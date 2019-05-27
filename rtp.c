@@ -16,33 +16,46 @@ void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data) {
         memset(frame->data, 0, DATA_SIZE);
     } else {
         frame->flags = 0;
-        memset(frame->data, 0, DATA_SIZE);
+        // memset(frame->data, 0, DATA_SIZE);
         memcpy(frame->data, data, strlen(data));
     }
 }
 
 int getData(TransmissionInfo *ti, rtp_h *frame, int timeout) {
-    fd_set set;
-	FD_ZERO(&set);
-	FD_SET(ti->socket, &set);
-    struct timeval Timeout;
-    Timeout.tv_sec = 0;
-	Timeout.tv_usec = timeout; 
-
     socklen_t len = sizeof(&ti->dest);
-    if(select(FD_SETSIZE, &set, 0, 0, &Timeout) != 0) {
-        return recvfrom(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, &len);
-    } else {
-        return -1;
-    }
+    return recvfrom(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, &len);
 }
 
 int sendData(TransmissionInfo *ti, rtp_h *frame) {
     int res;
+    struct timeval time;
     socklen_t peer_addr_len;
 	peer_addr_len = sizeof(struct sockaddr_storage);
+
+    // Set time on our packet in microseconds
+    // Used for timeout thread
+	gettimeofday(&time, NULL);
+	frame->time = (long)time.tv_sec;
+	frame->time *= 1000000;
+	frame->time += time.tv_usec;
     
     res = sendto(ti->socket, frame, FRAME_SIZE, 0, (struct sockaddr *)&ti->dest, peer_addr_len);
+    return res;
+}
+
+int sendLostData(TransmissionInfo *ti, rtp_h *frame) {
+    int res = randomSeq();
+    struct timeval time;
+    socklen_t peer_addr_len;
+	peer_addr_len = sizeof(struct sockaddr_storage);
+
+    // Set time on our packet in microseconds
+    // Used for timeout thread
+	gettimeofday(&time, NULL);
+	frame->time = (long)time.tv_sec;
+	frame->time *= 1000000;
+	frame->time += time.tv_usec;
+    
     return res;
 }
 
@@ -103,7 +116,6 @@ void dequeue(queue *q) {
         return;
     }
 
-    rtp_h *frame = &q->queue[0];
 	if (q->size > 1) {
         memmove(&q->queue[0], &q->queue[1], (q->size - 1) * sizeof(rtp_h));
     }
@@ -119,4 +131,39 @@ int isQueueFull(queue *q) {
 
 int isQueueEmpty(queue *q) {
     return q->count == 0 ? 1 : 0;
+}
+
+void *timeout(void *args) {
+    // Get args (rtp.h timeout_args)
+    struct timeout_arguments *t_args = args;
+    TransmissionInfo *transmissionInfo = t_args->arg1;
+    queue *q = t_args->arg2;
+
+    struct timeval timeout;
+    struct timeval currentTime;
+
+    timeout.tv_usec = 10000;
+
+    while (1) {
+            
+        // Get time
+        gettimeofday(&currentTime, NULL);
+        // Get time in microseconds.
+        long mTime = currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+
+        for (int i = 0; i < transmissionInfo->s_vars.window_size; i++) {
+            // If our queue item is in our window, check if it needs resend
+            if (transmissionInfo->s_vars.is + transmissionInfo->s_vars.window_size > q->queue[i].seq && transmissionInfo->s_vars.is < q->queue[i].seq) {
+                // If timeout is exceeded
+                if (timeout.tv_usec + q->queue[i].time <= mTime) {
+                    makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
+                    sendData(transmissionInfo, &q->queue[i]);
+                    printf("TIMEOUT: Resending packet, SEQ = %d, data = %s\n", q->queue[i].seq, q->queue[i].data);
+                }
+            }
+        }
+
+        usleep(1000000);
+    }
+    
 }

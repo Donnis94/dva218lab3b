@@ -27,6 +27,7 @@
 
 TransmissionInfo *transmissionInfo;
 queue readQueue;
+queue sentQueue;
 queue ackQueue;
 
 void teardown() {
@@ -86,19 +87,28 @@ void makeSocket() {
 }
 
 int main(int argc, const char *argv[]) { 
-    transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
-    /* Create a socket */
-    makeSocket();
-  
-    initState();
-
-    return EXIT_SUCCESS;
-}
-
-void initState() {
+  pthread_t timeout_thread;
+  transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
+  /* Create a socket */
+  makeSocket();
 
   initQueue(&readQueue, transmissionInfo->s_vars.window_size);
   initQueue(&ackQueue, transmissionInfo->s_vars.window_size);
+  initQueue(&sentQueue, transmissionInfo->s_vars.window_size);
+  
+    // Initiate timeout thread on sentQueue
+  struct timeout_arguments *args = malloc(sizeof(struct timeout_arguments));
+  args->arg1 = transmissionInfo;
+  args->arg2 = &sentQueue;
+
+  pthread_create(&timeout_thread, 0, &timeout, args);
+
+  initState();
+
+  return EXIT_SUCCESS;
+}
+
+void initState() {
   int state = WAIT_SYN;
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
 
@@ -144,6 +154,7 @@ void initState() {
         else if (frame->seq == transmissionInfo->r_vars.next) {
           printf("Expected packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
           enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
+          dequeue(&readQueue);
           transmissionInfo->r_vars.next++;
         }
         // Future
@@ -167,6 +178,6 @@ void initState() {
       break;
     }
 
-    sleep(1);
+    usleep(100000);
   }
 }

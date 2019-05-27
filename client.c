@@ -17,17 +17,45 @@ TransmissionInfo *transmissionInfo;
 queue sentQueue;
 queue ackQueue;
 
-void mainMenu(){
+void mainMenu(rtp_h *frame){
   int choice;
-  printf("Choose what to do:\n1.Send packet\n2.Quit connection to server\nInput: ");
+  printf("Choose what to do:\n");
+  printf("1. Send packet with arbitrary data:\n");
+  printf("2. Lose packet with arbitrary data:\n");
+  printf("3. Send packet with failed checksum:\n");
+  printf("4. Quit connection:\n");
   scanf("%d",&choice);
   fflush(stdout);
+
+  char * buffer = (char*)malloc(DATA_SIZE);
+  strncpy(buffer, "guten tag\0", DATA_SIZE);
+
   switch(choice){
 
     case 1:
+
+
+      // incrementSeq(transmissionInfo);
+      if (!isQueueFull(&sentQueue)) {
+        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
+        sendData(transmissionInfo, frame);
+        printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
+        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      }
+      break;
+
+    case 2:
+
+      // incrementSeq(transmissionInfo);
+      if (!isQueueFull(&sentQueue)) {
+        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
+        sendLostData(transmissionInfo, frame);
+        printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
+        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      }
       break;
     
-    case 2:
+    case 4:
       printf("\n\nPreparing to close...\n");
       teardown();
       break;
@@ -101,6 +129,7 @@ int makeSocket(char* hostName) {
 }
 
 int main (int argc, const char *argv[]){
+  pthread_t timeout_thread;
   char hostName[hostNameLength];
   transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
   /* Check arguments */
@@ -117,6 +146,14 @@ int main (int argc, const char *argv[]){
 
   initQueue(&sentQueue, transmissionInfo->s_vars.window_size);
   initQueue(&ackQueue, transmissionInfo->s_vars.window_size);
+
+  // Initiate timeout thread on sentQueue
+  struct timeout_arguments *args = malloc(sizeof(struct timeout_arguments));
+  args->arg1 = transmissionInfo;
+  args->arg2 = &sentQueue;
+
+  pthread_create(&timeout_thread, 0, &timeout, args);
+
   initState();
 
   return EXIT_SUCCESS;
@@ -126,9 +163,7 @@ void initState() {
   int state = INIT;
   rtp_h *frame = malloc(FRAME_SIZE);
 
-  while (1) {
-
-    getData(transmissionInfo, frame, 1);    
+  while (1) {  
 
     switch (state)
     {
@@ -139,13 +174,15 @@ void initState() {
 
       printf("Sending SYN, SEQ = %d\n", frame->seq);
       state = WAIT_SYNACK;
-
+      getData(transmissionInfo, frame, 1);
       break;
 
     case WAIT_SYNACK:
       if (frame->flags == SYN+ACK) {
         if (frame->ack == transmissionInfo->s_vars.is) {
           // An ack has been received for our SYN.
+          // Dequeue packet
+          dequeue(&sentQueue);
           // Increment oldest received
           transmissionInfo->s_vars.oldest++;
           transmissionInfo->r_vars.is = transmissionInfo->r_vars.next = frame->seq;
@@ -169,22 +206,18 @@ void initState() {
         // Received an ACK, increment oldest.
         transmissionInfo->r_vars.oldest++;
         printf("Received ACK for packet SEQ = %d\n", frame->ack);
+        dequeue(&sentQueue);
+				dequeue(&ackQueue);
+				transmissionInfo->s_vars.oldest++;
       }
 
       printf("\n\n");
 
-      mainMenu();
+      mainMenu(frame);
       printf("\n\n");
 
-      char * buffer = (char*)malloc(DATA_SIZE);
-      strncpy(buffer, "guten tag\0", DATA_SIZE);
-
-      // incrementSeq(transmissionInfo);
-
-      makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
-      sendData(transmissionInfo, frame);
-      printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
-      enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      getData(transmissionInfo, frame, 1);
+      
       break;
     
     default:
@@ -194,6 +227,7 @@ void initState() {
       break;
     }
 
-    sleep(1);
+    usleep(100000);
+
   }
 }

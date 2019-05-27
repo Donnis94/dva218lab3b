@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <time.h>
 #include <sys/select.h>
 
 #define PORT 5555
@@ -38,9 +39,10 @@ enum QueueType {
 };
 
 typedef struct {
+    long time;
     int flags;
     int id;
-    int ack; // Which sequence number are we ACKing
+    int ack;
     int seq;
     int windowsize;
     int crc;
@@ -69,10 +71,16 @@ typedef struct {
     int socket;
 } TransmissionInfo;
 
+struct timeout_arguments {
+    TransmissionInfo *arg1;
+    queue *arg2;
+}timeout_args;
+
 int randomSeq();
 void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data);
 int getData(TransmissionInfo *ti, rtp_h *frame, int timeout);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
+int sendLostData(TransmissionInfo *ti, rtp_h *frame);
 void initState();
 void teardown();
 
@@ -81,6 +89,8 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
 void dequeue(queue *q);
 int isQueueFull(queue *q);
 int isQueueEmpty(queue *q);
+
+void *timeout(void *args);
 
 // void incrementSeq(TransmissionInfo *transmissionInfo);
 // int getSeq(TransmissionInfo *transmissionInfo);
