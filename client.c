@@ -39,7 +39,7 @@ void mainMenu(rtp_h *frame){
       if (!isQueueFull(&sentQueue)) {
         makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
         sendData(transmissionInfo, frame);
-        printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
+        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
         enqueue(transmissionInfo, &sentQueue, *frame, SENT);
       }
       break;
@@ -50,7 +50,19 @@ void mainMenu(rtp_h *frame){
       if (!isQueueFull(&sentQueue)) {
         makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
         sendLostData(transmissionInfo, frame);
-        printf("Sent packet, SEQ = %d, data = %s\n", transmissionInfo->s_vars.next, frame->data);
+        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      }
+      break;
+
+    case 3:
+
+      // incrementSeq(transmissionInfo);
+      if (!isQueueFull(&sentQueue)) {
+        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
+        frame->crc = 1337;
+        sendData(transmissionInfo, frame);
+        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
         enqueue(transmissionInfo, &sentQueue, *frame, SENT);
       }
       break;

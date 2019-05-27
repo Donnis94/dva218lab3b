@@ -4,11 +4,26 @@ int randomSeq() {
     return rand() % 1000;
 }
 
+int checksum(char *data) {
+    int sum = 0;
+    int len = strlen(data);
+    for(int i = 0; i < len; i++) {
+        sum += data[i];
+    }
+    return sum;
+}
+
+int checkChecksum(char *data, int crc) {
+    int chk;
+    chk = checksum(data);
+
+    return chk == crc ? 1 : 0;
+}
+
 void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data) {
     frame->seq = seq;
     frame->ack = ack;
     
-    frame->crc = 0;
 
 
     if (flag != 0) {
@@ -16,6 +31,7 @@ void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data) {
         memset(frame->data, 0, DATA_SIZE);
     } else {
         frame->flags = 0;
+        frame->crc = checksum(data);
         // memset(frame->data, 0, DATA_SIZE);
         memcpy(frame->data, data, strlen(data));
     }
@@ -88,8 +104,14 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
 
         case RECEIVED:
             if (frame.seq >= transmissionInfo->r_vars.next && frame.seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->r_vars.next)){
-                memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
-                q->count++;
+                printf("CRC = %d\n", frame.crc);
+                if (checkChecksum(frame.data, frame.crc)) {
+                    memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
+                    q->count++;
+                } else {
+                    printf("Checksum failed, SEQ = %d, CRC = %s\n", frame.seq, frame.crc);
+                }
+
             } else {
                 printf("Received packet outside window size. SEQ = %d", frame.seq);
             }

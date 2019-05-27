@@ -149,23 +149,27 @@ void initState() {
         // Old packet
         if (frame->seq < transmissionInfo->r_vars.next) {
           printf("Old packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+          makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
+          printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
+          sendData(transmissionInfo, frame);
         }
         // Expected packet
         else if (frame->seq == transmissionInfo->r_vars.next) {
-          printf("Expected packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+          printf("Expected packet received, SEQ = %d, data = %s, CRC = %d\n", frame->seq, frame->data, frame->crc);
           enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
-          dequeue(&readQueue);
-          transmissionInfo->r_vars.next++;
+          while (readQueue.queue[0].seq == transmissionInfo->r_vars.next) {
+            dequeue(&readQueue);
+            transmissionInfo->r_vars.next++;
+            // makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
+            // printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
+            // sendData(transmissionInfo, frame);
+          }
         }
         // Future
         else if (frame->seq > transmissionInfo->r_vars.next) {
           printf("Future packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
           enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
         }
-
-        makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
-        printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
-        sendData(transmissionInfo, frame);
       }
 
       if (frame->flags == FIN) {

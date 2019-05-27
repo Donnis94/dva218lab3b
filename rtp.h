@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/select.h>
+#include <openssl/md5.h>
 
 #define PORT 5555
 #define DST "127.0.0.1"
@@ -77,6 +78,7 @@ struct timeout_arguments {
 }timeout_args;
 
 int randomSeq();
+int checksum(char *data);
 void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data);
 int getData(TransmissionInfo *ti, rtp_h *frame, int timeout);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
