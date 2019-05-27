@@ -10,70 +10,113 @@
 
 #include "rtp.h"
 
-#define hostNameLength 50
 #define messageLength 256
+
+char hostName[50];
+char message[DATA_SIZE];
+int split = 1;
+int error = 0;
 
 TransmissionInfo *transmissionInfo;
 queue sentQueue;
 queue ackQueue;
 
-void mainMenu(rtp_h *frame){
-  int choice;
-  printf("Choose what to do:\n");
-  printf("1. Send packet with arbitrary data:\n");
-  printf("2. Lose packet with arbitrary data:\n");
-  printf("3. Send packet with failed checksum:\n");
-  printf("4. Quit connection:\n");
-  scanf("%d",&choice);
-  fflush(stdout);
-
-  char * buffer = (char*)malloc(DATA_SIZE);
-  strncpy(buffer, "guten tag\0", DATA_SIZE);
-
-  switch(choice){
-
-    case 1:
-
-
-      // incrementSeq(transmissionInfo);
-      if (!isQueueFull(&sentQueue)) {
-        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
-        sendData(transmissionInfo, frame);
-        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
-        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+void parseArgs(int argc, char **argv) {
+  for (int i = 0; i < argc; ++i)
+  {
+      if (argc < 2) // no arguments were passed
+      {
+          printf("Please specify host with '-h <hostname>'");
+          exit(EXIT_FAILURE);
       }
-      break;
 
-    case 2:
-
-      // incrementSeq(transmissionInfo);
-      if (!isQueueFull(&sentQueue)) {
-        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
-        sendLostData(transmissionInfo, frame);
-        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
-        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      if (strcmp("-h", argv[i]) == 0)
+      {
+          strcpy(hostName, argv[i + 1]);
       }
-      break;
-
-    case 3:
-
-      // incrementSeq(transmissionInfo);
-      if (!isQueueFull(&sentQueue)) {
-        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
-        frame->crc = 1337;
-        sendData(transmissionInfo, frame);
-        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
-        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      if (strcmp("-m", argv[i]) == 0)
+      {
+          strcpy(message, argv[i + 1]);
+          printf("%s", message);
       }
-      break;
-    
-    case 4:
-      printf("\n\nPreparing to close...\n");
-      teardown();
-      break;
+      if (strcmp("-s", argv[i]) == 0)
+      {
+          split = atoi(argv[i+1]);
+      }
+      if (strcmp("-e", argv[i]) == 0)
+      {
+          error = atoi(argv[i+1]);
+      }
   }
-  
 }
+
+// void mainMenu(rtp_h *frame){
+//   int choice;
+//   printf("Choose what to do:\n");
+//   printf("1. Send packet with arbitrary data:\n");
+//   printf("2. Lose packet with arbitrary data:\n");
+//   printf("3. Send packet with failed checksum:\n");
+//   printf("4. Quit connection:\n");
+//   scanf("%d",&choice);
+//   fflush(stdout);
+
+//   char * buffer = (char*)malloc(DATA_SIZE);
+//   strncpy(buffer, "guten tag\0", DATA_SIZE);
+
+//   switch(choice){
+
+//   case 1:
+
+//     for (int i = 0; i < 5; i++) {
+//       char *charr = malloc(2);
+//       strncpy(charr, buffer + i, 1);
+//       charr[1] = '\0';
+//       makePacket(frame, transmissionInfo->s_vars.next, 0, 0, charr);
+//       sendData(transmissionInfo, frame);
+//       printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+//       enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+//     }
+//     // // incrementSeq(transmissionInfo);
+//     // if (!isQueueFull(&sentQueue)) {
+//     //   makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
+//     //   sendData(transmissionInfo, frame);
+//     //   printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+//     //   enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+//     // }
+
+//     break;
+
+//   case 2:
+
+//     // incrementSeq(transmissionInfo);
+//     if (!isQueueFull(&sentQueue)) {
+//       makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
+//       sendLostData(transmissionInfo, frame);
+//       printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+//       enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+//     }
+
+//     break;
+
+//   case 3:
+
+//     // incrementSeq(transmissionInfo);
+//     if (!isQueueFull(&sentQueue)) {
+//       makePacket(frame, transmissionInfo->s_vars.next, 0, 0, buffer);
+//       frame->crc = 1337;
+//       sendData(transmissionInfo, frame);
+//       printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+//       enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+//     }
+
+//     break;
+  
+//   case 4:
+//     printf("\n\nPreparing to close...\n");
+//     teardown();
+//     break;
+//   }
+// }
 
 void teardown() {
   rtp_h *frame = (rtp_h*)malloc(FRAME_SIZE);
@@ -137,22 +180,19 @@ int makeSocket(char* hostName) {
       exit(1);
   }
 
-	return 0;
+  int flags = fcntl(transmissionInfo->socket, F_GETFL, 0);
+  if (flags == -1) {
+    printf("Error setting socket to non-block");
+    exit(EXIT_FAILURE);
+  }
+  flags = (flags | O_NONBLOCK);
+  return (fcntl(transmissionInfo->socket, F_SETFL, flags) == 0) ? 0 : -1;
 }
 
-int main (int argc, const char *argv[]){
+int main (int argc, char **argv){
+  parseArgs(argc, argv);
   pthread_t timeout_thread;
-  char hostName[hostNameLength];
   transmissionInfo = (TransmissionInfo*)malloc(sizeof(TransmissionInfo));
-  /* Check arguments */
-  if(argv[1] == NULL) {
-      perror("Usage: client [host name]\n");
-      exit(EXIT_FAILURE);
-  }
-  else {
-      strncpy(hostName, argv[1], hostNameLength);
-      hostName[hostNameLength - 1] = '\0';
-  }
 
   makeSocket(hostName);
 
@@ -172,13 +212,17 @@ int main (int argc, const char *argv[]){
 }
 
 void initState() {
+  int messageIndex = 0;
+  int mLen = strlen(message);
   int state = INIT;
   rtp_h *frame = malloc(FRAME_SIZE);
 
   while (1) {  
 
-    switch (state)
-    {
+    getData(transmissionInfo, frame, 1);
+
+    switch (state) {
+
     case INIT:
       makePacket(frame, transmissionInfo->s_vars.is, 0, SYN, 0);
       sendData(transmissionInfo, frame);
@@ -223,13 +267,40 @@ void initState() {
 				transmissionInfo->s_vars.oldest++;
       }
 
-      printf("\n\n");
+      if (messageIndex < mLen && !isQueueFull(&sentQueue)) {
+          char *charr = malloc(2);
+          strncpy(charr, message + messageIndex, 1);
+          charr[1] = '\0';
+          messageIndex++;
 
-      mainMenu(frame);
-      printf("\n\n");
+          makePacket(frame, transmissionInfo->s_vars.next, 0, 0, charr);
+          if (messageIndex != 2) {
+            sendData(transmissionInfo, frame);
+          }
+          printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+          enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+      }
+
+      if (messageIndex >= mLen && isQueueEmpty(&sentQueue)) {
+        state = DONE;
+      }
+      
+      break;
+
+    case DONE:
+      if (frame->flags == ACK) {
+        // Received an ACK, increment oldest.
+        transmissionInfo->r_vars.oldest++;
+        printf("Received ACK for packet SEQ = %d\n", frame->ack);
+        dequeue(&sentQueue);
+				transmissionInfo->s_vars.oldest++;
+      }
+
+      if (isQueueEmpty(&sentQueue)) {
+        teardown();
+      }
 
       getData(transmissionInfo, frame, 1);
-      
       break;
     
     default:

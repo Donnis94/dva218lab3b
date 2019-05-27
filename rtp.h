@@ -8,9 +8,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <pthread.h>
-#include <time.h>
+#include <sys/time.h>
 #include <sys/select.h>
 #include <openssl/md5.h>
+#include <fcntl.h>
 
 #define PORT 5555
 #define DST "127.0.0.1"
@@ -26,6 +27,7 @@
 #define WAIT_ACK 3
 #define WAIT_FINACK 4
 #define CLOSED 99
+#define DONE 999
 
 #define ESTABLISHED 1337
 
@@ -87,7 +89,7 @@ void initState();
 void teardown();
 
 void initQueue(queue* q, int len);
-void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type);
+int enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type);
 void dequeue(queue *q);
 int isQueueFull(queue *q);
 int isQueueEmpty(queue *q);

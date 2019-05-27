@@ -62,8 +62,6 @@ int sendData(TransmissionInfo *ti, rtp_h *frame) {
 int sendLostData(TransmissionInfo *ti, rtp_h *frame) {
     int res = randomSeq();
     struct timeval time;
-    socklen_t peer_addr_len;
-	peer_addr_len = sizeof(struct sockaddr_storage);
 
     // Set time on our packet in microseconds
     // Used for timeout thread
@@ -81,11 +79,11 @@ void initQueue(queue* q, int len) {
     q->queue = malloc(len * sizeof(rtp_h));
 }
 
-void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type) {
+int enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type) {
 
     if (isQueueFull(q)) {
         printf("Queue is full");
-        return;
+        return -1;
     }
 
     if (frame.seq == 0) {
@@ -103,13 +101,19 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
             break;
 
         case RECEIVED:
+            for (int i = 0; i < q->count; i++) {
+                if (q->queue[i].seq == frame.seq) {
+                    printf("Already in queue.\n");
+                    return -1;
+                }
+            }
             if (frame.seq >= transmissionInfo->r_vars.next && frame.seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->r_vars.next)){
-                printf("CRC = %d\n", frame.crc);
                 if (checkChecksum(frame.data, frame.crc)) {
                     memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
                     q->count++;
                 } else {
-                    printf("Checksum failed, SEQ = %d, CRC = %s\n", frame.seq, frame.crc);
+                    printf("Checksum failed, SEQ = %d, CRC = %d\n", frame.seq, frame.crc);
+                    return -1;
                 }
 
             } else {
@@ -129,12 +133,14 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
         default:
             break;
     }
+
+    return 1;
 }
 
 void dequeue(queue *q) {
 
     if (isQueueEmpty(q)) {
-        printf("Queue is empty");
+        printf("Queue is empty\n");
         return;
     }
 
@@ -145,6 +151,7 @@ void dequeue(queue *q) {
     memset(&q->queue[q->size - 1], 0, sizeof(rtp_h));
 
     q->count--;
+
 }
 
 int isQueueFull(queue *q) {
@@ -175,7 +182,7 @@ void *timeout(void *args) {
 
         for (int i = 0; i < transmissionInfo->s_vars.window_size; i++) {
             // If our queue item is in our window, check if it needs resend
-            if (transmissionInfo->s_vars.is + transmissionInfo->s_vars.window_size > q->queue[i].seq && transmissionInfo->s_vars.is < q->queue[i].seq) {
+            if (q->queue[i].seq >= transmissionInfo->s_vars.oldest && q->queue[i].seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
                 // If timeout is exceeded
                 if (timeout.tv_usec + q->queue[i].time <= mTime) {
                     makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
