@@ -46,21 +46,18 @@ int sendData(TransmissionInfo *ti, rtp_h *frame) {
     return res;
 }
 
-// void incrementSeq(TransmissionInfo *transmissionInfo) {
-//     transmissionInfo->s_vars.seq = transmissionInfo->s_vars.seq + 1;
-// }
-
-// int getSeq(TransmissionInfo *transmissionInfo) {
-//     return transmissionInfo->s_vars.seq;
-// }
-
 void initQueue(queue* q, int len) {
-    q->queue = calloc(len, sizeof(rtp_h));
-    q->size = len;
     q->count = 0;
+    q->size = len;
+    q->queue = malloc(len * sizeof(rtp_h));
 }
 
 void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type) {
+
+    if (isQueueFull(q)) {
+        printf("Queue is full");
+        return;
+    }
 
     if (frame.seq == 0) {
         printf("Error adding, SEQ == 0");
@@ -99,7 +96,13 @@ void enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Que
     }
 }
 
-rtp_h* dequeue(queue *q) {
+void dequeue(queue *q) {
+
+    if (isQueueEmpty(q)) {
+        printf("Queue is empty");
+        return;
+    }
+
     rtp_h *frame = &q->queue[0];
 	if (q->size > 1) {
         memmove(&q->queue[0], &q->queue[1], (q->size - 1) * sizeof(rtp_h));
@@ -108,7 +111,6 @@ rtp_h* dequeue(queue *q) {
     memset(&q->queue[q->size - 1], 0, sizeof(rtp_h));
 
     q->count--;
-    return frame;
 }
 
 int isQueueFull(queue *q) {
