@@ -171,7 +171,7 @@ void *timeout(void *args) {
     struct timeval timeout;
     struct timeval currentTime;
 
-    timeout.tv_usec = 10000;
+    timeout.tv_usec = 1000000;
 
     while (1) {
             
