@@ -16,6 +16,7 @@ char hostName[50];
 char message[DATA_SIZE];
 int split = 1;
 int error = 0;
+int protocol = 0;
 
 TransmissionInfo *transmissionInfo;
 queue sentQueue;
@@ -46,6 +47,10 @@ void parseArgs(int argc, char **argv) {
       if (strcmp("-e", argv[i]) == 0)
       {
           error = atoi(argv[i+1]);
+      }
+      if (strcmp("-c", argv[i]) == 0)
+      {
+          protocol = 1;
       }
   }
 }
@@ -203,8 +208,11 @@ int main (int argc, char **argv){
   struct timeout_arguments *args = malloc(sizeof(struct timeout_arguments));
   args->arg1 = transmissionInfo;
   args->arg2 = &sentQueue;
-
-  pthread_create(&timeout_thread, 0, &timeout, args);
+  args->arg3 = &ackQueue;
+  if (protocol ==0)
+    pthread_create(&timeout_thread, 0, &timeout, args);
+  else
+    pthread_create(&timeout_thread, 0, &selectiveTimeout, args);
 
   initState();
 
@@ -262,9 +270,17 @@ void initState() {
         // Received an ACK, increment oldest.
         transmissionInfo->r_vars.oldest++;
         printf("Received ACK for packet SEQ = %d\n", frame->ack);
-        dequeue(&sentQueue);
-				dequeue(&ackQueue);
-				transmissionInfo->s_vars.oldest++;
+        if(protocol == 0){
+          dequeue(&sentQueue);
+          dequeue(&ackQueue);
+          transmissionInfo->s_vars.oldest++;
+        }
+        else if(protocol == 1){
+          for (int i = 0; i < transmissionInfo->s_vars.window_size; i++){
+              if()
+
+          }
+        }
       }
 
       if (messageIndex < mLen && !isQueueFull(&sentQueue)) {

@@ -194,5 +194,43 @@ void *timeout(void *args) {
 
         usleep(1000000);
     }
+}
+    void *selectiveTimeout(void *args) {
+    // Get args (rtp.h timeout_args)
+    struct timeout_arguments *t_args = args;
+    TransmissionInfo *transmissionInfo = t_args->arg1;
+    queue *q = t_args->arg2;
+    queue *p = t_args->arg3;
+
+    struct timeval timeout;
+    struct timeval currentTime;
+
+    timeout.tv_usec = 1000000;
+
+    while (1) {
+            
+        // Get time
+        gettimeofday(&currentTime, NULL);
+        // Get time in microseconds.
+        long mTime = currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+
+        for (int i = 0; i < transmissionInfo->s_vars.window_size; i++) {
+            // If our queue item is in our window, check if it needs resend
+            if (q->queue[i].seq >= transmissionInfo->s_vars.oldest && q->queue[i].seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
+                // If timeout is exceeded
+                if (timeout.tv_usec + q->queue[i].time <= mTime) {
+                    for (int e=0; e < WINDOW_SIZE, e++){
+                        if (q->queue[i] == p->queue[e]) {
+                            makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
+                            sendData(transmissionInfo, &q->queue[i]);
+                            printf("TIMEOUT: Resending packet, SEQ = %d, data = %s\n", q->queue[i].seq, q->queue[i].data);
+                        }
+                    }
+                }
+            }
+        }
+
+        usleep(1000000);
+    }
     
 }

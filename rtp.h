@@ -77,6 +77,7 @@ typedef struct {
 struct timeout_arguments {
     TransmissionInfo *arg1;
     queue *arg2;
+    queue *arg3;
 }timeout_args;
 
 int randomSeq();
@@ -93,7 +94,7 @@ int enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Queu
 void dequeue(queue *q);
 int isQueueFull(queue *q);
 int isQueueEmpty(queue *q);
-
+void selectiveState();
 void *timeout(void *args);
 
 // void incrementSeq(TransmissionInfo *transmissionInfo);
