@@ -171,7 +171,7 @@ void *timeout(void *args) {
     struct timeval timeout;
     struct timeval currentTime;
 
-    timeout.tv_usec = 1000000;
+    timeout.tv_usec = 100000;
 
     while (1) {
             
@@ -192,7 +192,7 @@ void *timeout(void *args) {
             }
         }
 
-        usleep(1000000);
+         usleep(10000);
     }
 }
     void *selectiveTimeout(void *args) {

@@ -31,6 +31,19 @@ void parseArgs(int argc, char **argv) {
           exit(EXIT_FAILURE);
       }
 
+      if (strcmp("--help", argv[i]) == 0)
+      {
+          printf("------------------------------\n");
+          printf("RTP Implementation\n\n");
+          printf("Usage: client -h <ip> -m <message> [OPTION]\n");
+          printf("\n");
+          printf("\n-h=HOSTNAME\n\tSpecify a hostname to connect to, eg. localhost\n");
+          printf("\n-m=MESSAGE\n\tSpecify a message to send. The message will be sent in splits of 1 by default. To change this, specify -s <split>. To send a message with spaces, use quotes (\"\").\n");
+          printf("\n-e=ERROR\n\tError fault percentage.\n");
+          printf("\n-s=SPLIT\n\tHow many characters should be sent in a single packet.\n");
+          exit(EXIT_SUCCESS);
+      }
+
       if (strcmp("-h", argv[i]) == 0)
       {
           strcpy(hostName, argv[i + 1]);
@@ -38,7 +51,6 @@ void parseArgs(int argc, char **argv) {
       if (strcmp("-m", argv[i]) == 0)
       {
           strcpy(message, argv[i + 1]);
-          printf("%s", message);
       }
       if (strcmp("-s", argv[i]) == 0)
       {
@@ -227,7 +239,9 @@ void initState() {
 
   while (1) {  
 
-    getData(transmissionInfo, frame, 1);
+    if (getData(transmissionInfo, frame, 1) <= 0) {
+      memset(frame, 0x0, sizeof(rtp_h));
+    }
 
     switch (state) {
 
@@ -266,13 +280,12 @@ void initState() {
 
     case ESTABLISHED:      
 
-      if (frame->flags == ACK) {
+      if (frame->flags == ACK && frame->ack == sentQueue.queue[0].seq) {
         // Received an ACK, increment oldest.
         transmissionInfo->r_vars.oldest++;
         printf("Received ACK for packet SEQ = %d\n", frame->ack);
         if(protocol == 0){
           dequeue(&sentQueue);
-          dequeue(&ackQueue);
           transmissionInfo->s_vars.oldest++;
         }
         else if(protocol == 1){
@@ -283,16 +296,21 @@ void initState() {
         }
       }
 
-      if (messageIndex < mLen && !isQueueFull(&sentQueue)) {
-          char *charr = malloc(2);
-          strncpy(charr, message + messageIndex, 1);
-          charr[1] = '\0';
-          messageIndex++;
+      char *charr = calloc(DATA_SIZE, 1);
+      memset(charr, 0x0, DATA_SIZE);
+      while (messageIndex < mLen && !isQueueFull(&sentQueue)) {
+          if (mLen - messageIndex >= split) {
+            strncpy(charr, message + messageIndex, split);
+            charr[split] = '\0';
+          } else {
+            strncpy(charr, message + messageIndex, mLen - messageIndex);
+            charr[mLen - messageIndex] = '\0';
+          }
 
           makePacket(frame, transmissionInfo->s_vars.next, 0, 0, charr);
-          if (messageIndex != 2) {
-            sendData(transmissionInfo, frame);
-          }
+          // Testing packet loss on third character in our message
+          sendData(transmissionInfo, frame);
+          messageIndex += split;
           printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
           enqueue(transmissionInfo, &sentQueue, *frame, SENT);
       }
@@ -326,7 +344,7 @@ void initState() {
       break;
     }
 
-    usleep(100000);
+    usleep(10000);
 
   }
 }
