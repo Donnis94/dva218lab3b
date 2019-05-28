@@ -189,6 +189,9 @@ void initState() {
         if (protocol == SR && frame->seq <= transmissionInfo->r_vars.next + transmissionInfo->s_vars.window_size) {
           if (frame->seq < transmissionInfo->r_vars.next) {
             printf("Old packet received, SEQ = %d, data = %s\n", frame->seq, frame->data);
+            makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
+            printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
+            sendData(transmissionInfo, frame);
           }
 
           else if (frame->seq == transmissionInfo->r_vars.next) {
@@ -196,12 +199,15 @@ void initState() {
             makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
             printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
             sendData(transmissionInfo, frame);
+            transmissionInfo->s_vars.next++;
             transmissionInfo->r_vars.next++;
+            strcat(message, frame->data);
 
             int index = isInQueue(&readQueue, transmissionInfo->r_vars.next);
             while (index >= 0) {
               removeFromQueue(&readQueue, index);
               transmissionInfo->r_vars.next++;
+              strcat(message, readQueue.queue[index].data);
 
               index = isInQueue(&readQueue, transmissionInfo->r_vars.next);
             }
@@ -209,10 +215,12 @@ void initState() {
 
           else if (frame->seq > transmissionInfo->r_vars.next) {
             printf("Future packet received, SEQ = %d, data = %s, saving in buffer...\n", frame->seq, frame->data);
+            enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
+            
             makePacket(frame, transmissionInfo->s_vars.next, frame->seq, ACK, 0);
             printf("Sending ACK, SEQ = %d, ACK = %d, FLAG = %d\n", frame->seq, frame->ack, frame->flags);
             sendData(transmissionInfo, frame);
-            enqueue(transmissionInfo, &readQueue, *frame, RECEIVED);
+            transmissionInfo->s_vars.next++;
           }
         }
 

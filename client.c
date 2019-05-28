@@ -250,6 +250,9 @@ void initState() {
       sendData(transmissionInfo, frame);
       enqueue(transmissionInfo, &sentQueue, *frame, SENT);
 
+      transmissionInfo->r_vars.is = frame->seq;
+      transmissionInfo->r_vars.next = transmissionInfo->r_vars.is + 1;
+
       printf("Sending SYN, SEQ = %d\n", frame->seq);
       state = WAIT_SYNACK;
       getData(transmissionInfo, frame, 1);
@@ -283,6 +286,8 @@ void initState() {
       if (frame->flags == ACK) {
         // Received an ACK, increment oldest.
         printf("Received ACK for packet SEQ = %d\n", frame->ack);
+        enqueue(transmissionInfo, &ackQueue, *frame, ACKNOWLEDGEMENT);
+
         if (protocol == GBN) {
           if (frame->ack == sentQueue.queue[0].seq) {
             transmissionInfo->r_vars.oldest++;
@@ -292,25 +297,37 @@ void initState() {
         }
 
         else if(protocol == SR) {
-          // while (sentQueue.queue[0].seq == transmissionInfo->r_vars.oldest) {
-          //   transmissionInfo->r_vars.oldest++;
-          //   dequeue(&sentQueue);
-          //   transmissionInfo->s_vars.oldest++;
-          // }
-          // for (int i = 0; i < sentQueue.count; i++) {
-          //   if (sentQueue.queue[i].seq == frame->ack) {
-          //     removeFromQueue(&sentQueue, i);
-          //     // transmissionInfo->r_vars.oldest++;
-          //     // transmissionInfo->s_vars.oldest++;
-          //   }
-          // }
-          int index = isInQueue(&sentQueue, frame->seq);
-          while (index >= 0) {
-            removeFromQueue(&sentQueue, index);
-            transmissionInfo->r_vars.next++;
+          // ACK
+          
+          // CASE 1: FIRST
+          int sentIndex = isInQueue(&sentQueue, frame->ack);
 
-            index = isInQueue(&sentQueue, transmissionInfo->r_vars.next);
+          if (sentIndex != -1) {
+            removeFromQueue(&sentQueue, sentIndex);
           }
+
+          int oldestIndex = isInQueue(&ackQueue, transmissionInfo->s_vars.oldest);
+
+          while (oldestIndex != -1) {
+            removeFromQueue(&ackQueue, oldestIndex);
+            transmissionInfo->s_vars.oldest++;
+            oldestIndex = isInQueue(&ackQueue, transmissionInfo->s_vars.oldest);
+          }
+
+          // while(ackIndex != -1) {
+          //   if (sentIndex != -1) {
+          //     removeFromQueue(&sentQueue, sentIndex);
+          //   }s
+          //   removeFromQueue(&ackQueue, ackIndex);
+          //   // removeFromQueue(&sentQueue, sentIndex);
+          //   ackIndex = isInQueue(&ackQueue, transmissionInfo->r_vars.next);
+          //   // sentIndex = isInQueue(&sentQueue, transmissionInfo->r_vars.oldest);
+          // }
+
+          // if (ackIndex != -1 && sentIndex != -1) {
+          //   removeFromQueue(&ackQueue, ackIndex);
+          //   removeFromQueue(&sentQueue, sentIndex);
+          // }
         }
       }
 

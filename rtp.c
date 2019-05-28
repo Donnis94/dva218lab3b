@@ -117,16 +117,17 @@ int enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum Queu
                 }
 
             } else {
-                printf("Received packet outside window size. SEQ = %d", frame.seq);
+                printf("Received packet outside window size. SEQ = %d\n", frame.seq);
             }
             break;
 
         case ACKNOWLEDGEMENT:
+            transmissionInfo->r_vars.next++;
             if (frame.seq >= transmissionInfo->s_vars.oldest && frame.seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
                 memcpy((&q->queue[index]), &frame, sizeof(rtp_h));
                 q->count++;
             } else {
-                printf("Received packet outside window size. SEQ = %d", frame.seq);
+                printf("Received ACK outside window size. SEQ = %d\n", frame.seq);
             }
             break;    
 
@@ -159,14 +160,13 @@ void removeFromQueue(queue *q, int index) {
         printf("Queue is empty\n");
         return;
     }
-
-	if (q->size > 1) {
-        memmove(&q->queue[index], &q->queue[1], (q->size - 1) * sizeof(rtp_h));
-    }
+    
+    memmove(&q->queue[index], &q->queue[index + 1], ((q->size - 1) - index) * sizeof(rtp_h));
 
     memset(&q->queue[q->size - 1], 0, sizeof(rtp_h));
 
     q->count--;
+
 }
 
 void clearQueue(queue *q) {
@@ -201,7 +201,7 @@ void *timeout(void *args) {
     struct timeval timeout;
     struct timeval currentTime;
 
-    timeout.tv_usec = 100000;
+    timeout.tv_usec = 1000000;
 
     while (1) {
             
@@ -222,7 +222,7 @@ void *timeout(void *args) {
             }
         }
 
-         usleep(10000);
+         usleep(100000);
     }
 }
 void *selectiveTimeout(void *args) {
