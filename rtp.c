@@ -154,6 +154,36 @@ void dequeue(queue *q) {
 
 }
 
+void removeFromQueue(queue *q, int index) {
+    if (isQueueEmpty(q)) {
+        printf("Queue is empty\n");
+        return;
+    }
+
+	if (q->size > 1) {
+        memmove(&q->queue[index], &q->queue[1], (q->size - 1) * sizeof(rtp_h));
+    }
+
+    memset(&q->queue[q->size - 1], 0, sizeof(rtp_h));
+
+    q->count--;
+}
+
+void clearQueue(queue *q) {
+    memset(q->queue, 0, sizeof(rtp_h) * q->size);
+    q->count = 0;
+}
+
+int isInQueue(queue* q, int seq) {
+    for (int i = 0; i < q->count; i++) {
+        if (q->queue[i].seq == seq) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 int isQueueFull(queue *q) {
     return q->count == q->size ? 1 : 0;
 }
@@ -195,42 +225,43 @@ void *timeout(void *args) {
          usleep(10000);
     }
 }
-    void *selectiveTimeout(void *args) {
-    // Get args (rtp.h timeout_args)
-    struct timeout_arguments *t_args = args;
-    TransmissionInfo *transmissionInfo = t_args->arg1;
-    queue *q = t_args->arg2;
-    queue *p = t_args->arg3;
+void *selectiveTimeout(void *args) {
+// Get args (rtp.h timeout_args)
+struct timeout_arguments *t_args = args;
+TransmissionInfo *transmissionInfo = t_args->arg1;
+queue *q = t_args->arg2;
+queue *p = t_args->arg3;
 
-    struct timeval timeout;
-    struct timeval currentTime;
+struct timeval timeout;
+struct timeval currentTime;
 
-    timeout.tv_usec = 1000000;
+timeout.tv_usec = 1000000;
 
-    while (1) {
-            
-        // Get time
-        gettimeofday(&currentTime, NULL);
-        // Get time in microseconds.
-        long mTime = currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+while (1) {
+        
+    // Get time
+    gettimeofday(&currentTime, NULL);
+    // Get time in microseconds.
+    long mTime = currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
 
-        for (int i = 0; i < transmissionInfo->s_vars.window_size; i++) {
-            // If our queue item is in our window, check if it needs resend
-            if (q->queue[i].seq >= transmissionInfo->s_vars.oldest && q->queue[i].seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
-                // If timeout is exceeded
-                if (timeout.tv_usec + q->queue[i].time <= mTime) {
-                    for (int e=0; e < WINDOW_SIZE, e++){
-                        if (q->queue[i] == p->queue[e]) {
-                            makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
-                            sendData(transmissionInfo, &q->queue[i]);
-                            printf("TIMEOUT: Resending packet, SEQ = %d, data = %s\n", q->queue[i].seq, q->queue[i].data);
-                        }
+    for (int i = 0; i < transmissionInfo->s_vars.window_size; i++) {
+        // If our queue item is in our window, check if it needs resend
+        if (q->queue[i].seq >= transmissionInfo->s_vars.oldest && q->queue[i].seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
+            // If timeout is exceeded
+            if (timeout.tv_usec + q->queue[i].time <= mTime) {
+                for (int e = 0; e < WINDOW_SIZE; e++) {
+                    if (q->queue[i].seq == p->queue[e].seq) {
+                        makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
+                        sendData(transmissionInfo, &q->queue[i]);
+                        printf("TIMEOUT: Resending packet, SEQ = %d, data = %s\n", q->queue[i].seq, q->queue[i].data);
                     }
                 }
             }
         }
+    }
 
-        usleep(1000000);
+    usleep(1000000);
+
     }
     
 }

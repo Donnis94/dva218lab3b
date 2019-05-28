@@ -35,6 +35,9 @@
 #define ACK 421
 #define FIN 422
 
+#define GBN 333
+#define SR 334
+
 enum QueueType {
     SENT,
     RECEIVED,
@@ -92,10 +95,14 @@ void teardown();
 void initQueue(queue* q, int len);
 int enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type);
 void dequeue(queue *q);
+void removeFromQueue(queue *q, int index);
+void clearQueue(queue *q);
+int isInQueue(queue* q, int seq);
 int isQueueFull(queue *q);
 int isQueueEmpty(queue *q);
 void selectiveState();
 void *timeout(void *args);
+void *selectiveTimeout(void *args);
 
 // void incrementSeq(TransmissionInfo *transmissionInfo);
 // int getSeq(TransmissionInfo *transmissionInfo);

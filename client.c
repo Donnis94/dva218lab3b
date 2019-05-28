@@ -16,7 +16,7 @@ char hostName[50];
 char message[DATA_SIZE];
 int split = 1;
 int error = 0;
-int protocol = 0;
+int protocol = GBN;
 
 TransmissionInfo *transmissionInfo;
 queue sentQueue;
@@ -62,7 +62,7 @@ void parseArgs(int argc, char **argv) {
       }
       if (strcmp("-c", argv[i]) == 0)
       {
-          protocol = 1;
+          protocol = SR;
       }
   }
 }
@@ -221,10 +221,10 @@ int main (int argc, char **argv){
   args->arg1 = transmissionInfo;
   args->arg2 = &sentQueue;
   args->arg3 = &ackQueue;
-  if (protocol ==0)
-    pthread_create(&timeout_thread, 0, &timeout, args);
-  else
-    pthread_create(&timeout_thread, 0, &selectiveTimeout, args);
+  // if (protocol == GBN)
+  pthread_create(&timeout_thread, 0, &timeout, args);
+  // else
+  //   pthread_create(&timeout_thread, 0, &selectiveTimeout, args);
 
   initState();
 
@@ -280,39 +280,59 @@ void initState() {
 
     case ESTABLISHED:      
 
-      if (frame->flags == ACK && frame->ack == sentQueue.queue[0].seq) {
+      if (frame->flags == ACK) {
         // Received an ACK, increment oldest.
-        transmissionInfo->r_vars.oldest++;
         printf("Received ACK for packet SEQ = %d\n", frame->ack);
-        if(protocol == 0){
-          dequeue(&sentQueue);
-          transmissionInfo->s_vars.oldest++;
+        if (protocol == GBN) {
+          if (frame->ack == sentQueue.queue[0].seq) {
+            transmissionInfo->r_vars.oldest++;
+            dequeue(&sentQueue);
+            transmissionInfo->s_vars.oldest++;
+          }
         }
-        else if(protocol == 1){
-          for (int i = 0; i < transmissionInfo->s_vars.window_size; i++){
-              if()
 
+        else if(protocol == SR) {
+          // while (sentQueue.queue[0].seq == transmissionInfo->r_vars.oldest) {
+          //   transmissionInfo->r_vars.oldest++;
+          //   dequeue(&sentQueue);
+          //   transmissionInfo->s_vars.oldest++;
+          // }
+          // for (int i = 0; i < sentQueue.count; i++) {
+          //   if (sentQueue.queue[i].seq == frame->ack) {
+          //     removeFromQueue(&sentQueue, i);
+          //     // transmissionInfo->r_vars.oldest++;
+          //     // transmissionInfo->s_vars.oldest++;
+          //   }
+          // }
+          int index = isInQueue(&sentQueue, frame->seq);
+          while (index >= 0) {
+            removeFromQueue(&sentQueue, index);
+            transmissionInfo->r_vars.next++;
+
+            index = isInQueue(&sentQueue, transmissionInfo->r_vars.next);
           }
         }
       }
 
       char *charr = calloc(DATA_SIZE, 1);
-      memset(charr, 0x0, DATA_SIZE);
       while (messageIndex < mLen && !isQueueFull(&sentQueue)) {
-          if (mLen - messageIndex >= split) {
-            strncpy(charr, message + messageIndex, split);
-            charr[split] = '\0';
-          } else {
-            strncpy(charr, message + messageIndex, mLen - messageIndex);
-            charr[mLen - messageIndex] = '\0';
-          }
+        memset(charr, 0x0, DATA_SIZE);
+        if (mLen - messageIndex > split) {
+          strncpy(charr, message + messageIndex, split);
+          charr[split] = '\0';
+        } else {
+          strncpy(charr, message + messageIndex, mLen - messageIndex);
+          charr[mLen - messageIndex] = '\0';
+        }
 
-          makePacket(frame, transmissionInfo->s_vars.next, 0, 0, charr);
-          // Testing packet loss on third character in our message
+        makePacket(frame, transmissionInfo->s_vars.next, 0, 0, charr);
+        // Testing packet loss on third character in our message
+        if (messageIndex != 1) {
           sendData(transmissionInfo, frame);
-          messageIndex += split;
-          printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
-          enqueue(transmissionInfo, &sentQueue, *frame, SENT);
+        }
+        messageIndex += split;
+        printf("Sent packet, SEQ = %d, data = %s, CRC = %d\n", transmissionInfo->s_vars.next, frame->data, frame->crc);
+        enqueue(transmissionInfo, &sentQueue, *frame, SENT);
       }
 
       if (messageIndex >= mLen && isQueueEmpty(&sentQueue)) {
