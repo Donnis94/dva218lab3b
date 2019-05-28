@@ -41,7 +41,7 @@ enum QueueType {
     ACKNOWLEDGEMENT
 };
 
-typedef struct {
+typedef struct rtp_header {
     long time;
     int flags;
     int id;

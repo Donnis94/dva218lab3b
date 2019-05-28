@@ -25,6 +25,8 @@
 #define PORT 5555
 #define MAXMSG 512
 
+char message[DATA_SIZE];
+
 TransmissionInfo *transmissionInfo;
 queue readQueue;
 queue sentQueue;
@@ -114,7 +116,9 @@ void initState() {
 
   while (1) {
 
-    getData(transmissionInfo, frame, 1);
+    if (getData(transmissionInfo, frame, 1) <= 0) {
+      memset(frame, 0x0, sizeof(rtp_h));
+    }
 
     switch (state)
     {
@@ -156,7 +160,9 @@ void initState() {
         // Expected packet
         else if (frame->seq == transmissionInfo->r_vars.next) {
         printf("Expected packet received, SEQ = %d, data = %s, CRC = %d\n", frame->seq, frame->data, frame->crc);
+          dequeue(&readQueue);
           transmissionInfo->r_vars.next++;
+          strcat(message, frame->data);
           while (readQueue.queue[0].seq == transmissionInfo->r_vars.next) {
             rtp_h *ackFrame = malloc(sizeof(rtp_h));
             makePacket(ackFrame, transmissionInfo->s_vars.next, readQueue.queue[0].seq, ACK, 0);
@@ -164,6 +170,7 @@ void initState() {
             sendData(transmissionInfo, ackFrame);
             dequeue(&readQueue);
             transmissionInfo->r_vars.next++;
+            strcat(message, frame->data);
           }
 
           if (isQueueEmpty(&readQueue)) {
@@ -187,6 +194,7 @@ void initState() {
       }
 
       if (frame->flags == FIN) {
+        printf("\n\nFinal message: %s\n\n", message);
         teardown();
       }
 
@@ -196,6 +204,6 @@ void initState() {
       break;
     }
 
-    usleep(100000);
+    usleep(10000);
   }
 }
