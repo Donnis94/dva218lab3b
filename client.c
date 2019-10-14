@@ -221,10 +221,10 @@ int main (int argc, char **argv){
   args->arg1 = transmissionInfo;
   args->arg2 = &sentQueue;
   args->arg3 = &ackQueue;
-  // if (protocol == GBN)
-  pthread_create(&timeout_thread, 0, &timeout, args);
-  // else
-  //   pthread_create(&timeout_thread, 0, &selectiveTimeout, args);
+  if (protocol == GBN)
+    pthread_create(&timeout_thread, 0, &timeout, args);
+  else
+    pthread_create(&timeout_thread, 0, &selectiveTimeout, args);
 
   initState();
 
@@ -300,15 +300,23 @@ void initState() {
           // ACK
           
           // CASE 1: FIRST
-          int sentIndex = isInQueue(&sentQueue, frame->ack);
+          //int sentIndex = isInQueue(&sentQueue, frame->ack);
 
-          if (sentIndex != -1) {
-            removeFromQueue(&sentQueue, sentIndex);
+          if (frame->ack == transmissionInfo->s_vars.oldest) {
+            // oldest sent ACK
+            dequeue(&sentQueue);
+            transmissionInfo->s_vars.oldest++;
+
+            int oldestIndex = isInQueue(&ackQueue, frame->ack);
+
+            removeFromQueue(&ackQueue, oldestIndex);
+            transmissionInfo->r_vars.oldest++;
           }
 
           int oldestIndex = isInQueue(&ackQueue, transmissionInfo->s_vars.oldest);
 
           while (oldestIndex != -1) {
+            dequeue(&sentQueue);
             removeFromQueue(&ackQueue, oldestIndex);
             transmissionInfo->s_vars.oldest++;
             oldestIndex = isInQueue(&ackQueue, transmissionInfo->s_vars.oldest);
@@ -341,10 +349,12 @@ void initState() {
           strncpy(charr, message + messageIndex, mLen - messageIndex);
           charr[mLen - messageIndex] = '\0';
         }
-
         makePacket(frame, transmissionInfo->s_vars.next, 0, 0, charr);
         // Testing packet loss on third character in our message
-        if (messageIndex != 1) {
+        if (messageIndex == 2) {
+          sendLostData(transmissionInfo, frame);
+        } else {
+
           sendData(transmissionInfo, frame);
         }
         messageIndex += split;

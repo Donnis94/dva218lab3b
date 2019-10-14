@@ -32,7 +32,7 @@ void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data) {
     } else {
         frame->flags = 0;
         frame->crc = checksum(data);
-        // memset(frame->data, 0, DATA_SIZE);
+        memset(frame->data, 0, DATA_SIZE);
         memcpy(frame->data, data, strlen(data));
     }
 }
@@ -60,6 +60,7 @@ int sendData(TransmissionInfo *ti, rtp_h *frame) {
 }
 
 int sendLostData(TransmissionInfo *ti, rtp_h *frame) {
+    printf("LOST PACKET SEQ = %d, data = %s", frame->seq, frame->data);
     int res = randomSeq();
     struct timeval time;
 
@@ -230,7 +231,7 @@ void *selectiveTimeout(void *args) {
 struct timeout_arguments *t_args = args;
 TransmissionInfo *transmissionInfo = t_args->arg1;
 queue *q = t_args->arg2;
-queue *p = t_args->arg3;
+queue *ackQueue = t_args->arg3;
 
 struct timeval timeout;
 struct timeval currentTime;
@@ -238,7 +239,6 @@ struct timeval currentTime;
 timeout.tv_usec = 1000000;
 
 while (1) {
-        
     // Get time
     gettimeofday(&currentTime, NULL);
     // Get time in microseconds.
@@ -249,12 +249,11 @@ while (1) {
         if (q->queue[i].seq >= transmissionInfo->s_vars.oldest && q->queue[i].seq < (transmissionInfo->s_vars.window_size) + (transmissionInfo->s_vars.oldest)){
             // If timeout is exceeded
             if (timeout.tv_usec + q->queue[i].time <= mTime) {
-                for (int e = 0; e < WINDOW_SIZE; e++) {
-                    if (q->queue[i].seq == p->queue[e].seq) {
-                        makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
-                        sendData(transmissionInfo, &q->queue[i]);
-                        printf("TIMEOUT: Resending packet, SEQ = %d, data = %s\n", q->queue[i].seq, q->queue[i].data);
-                    }
+                if(isInQueue(ackQueue, q->queue[i].seq) == -1)
+                {
+                    makePacket(&q->queue[i], q->queue[i].seq, 0, 0, q->queue[i].data);
+                    sendData(transmissionInfo, &q->queue[i]);
+                    printf("TIMEOUT: Resending packet, SEQ = %d, data = %s\n", q->queue[i].seq, q->queue[i].data);
                 }
             }
         }
