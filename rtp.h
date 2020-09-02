@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <sys/select.h>
 #include <openssl/md5.h>
+#include <stdarg.h>
 #include <fcntl.h>
 
 #define PORT 5555
@@ -44,7 +45,9 @@ enum QueueType {
     ACKNOWLEDGEMENT
 };
 
+// A packet being sent
 typedef struct rtp_header {
+    long stime;
     long time;
     int flags;
     int id;
@@ -57,34 +60,43 @@ typedef struct rtp_header {
 
 typedef struct
 {
-	rtp_h *queue;
-	int size;
-	int count;
+	rtp_h *queue;           // All of the items in the queue
+	int size;               // The max size of the queue
+	int count;              // The current size of the queue
+    enum QueueType type;    // The type of queue
 } queue;
 
 typedef struct Variables {
-    int is; // initial sequence
-    int oldest; // oldest unacked packet
-    int next; // next expected (if frame->flags < next => old packet)
+    int is;             // initial sequence
+    int oldest;         // oldest unacked packet
+    int next;           // next expected (if frame->flags < next => old packet)
     int window_size;
 } Variables;
 
 typedef struct {
     struct sockaddr_in host;
     struct sockaddr_in dest;
-    struct Variables s_vars;
-    struct Variables r_vars;
+    struct Variables s_vars; // Sent variables (initial, oldest etc.)
+    struct Variables r_vars; // Received variables (initial, oldest etc.)
     int socket;
 } TransmissionInfo;
 
+// The struct sent to the timeout queue
 struct timeout_arguments {
     TransmissionInfo *arg1;
     queue *arg2;
-    queue *arg3;
 }timeout_args;
 
+void setVerboseLevel(int level);
+void setErrorLevel(float level);
+void p(char * format, ...);
 int randomSeq();
 int checksum(char *data);
+int checksumFrame(rtp_h *frame);
+
+int checkChecksum(char *data, int crc);
+int checkChecksumFrame(rtp_h *frame, int crc);
+
 void makePacket(rtp_h *frame, int seq, int ack, int flag, char* data);
 int getData(TransmissionInfo *ti, rtp_h *frame, int timeout);
 int sendData(TransmissionInfo *ti, rtp_h *frame);
@@ -92,8 +104,9 @@ int sendLostData(TransmissionInfo *ti, rtp_h *frame);
 void initState();
 void teardown();
 
-void initQueue(queue* q, int len);
+void initQueue(queue* q, int len, enum QueueType type);
 int enqueue(TransmissionInfo *transmissionInfo, queue *q, rtp_h frame, enum QueueType type);
+void printQueue(queue *q);
 void dequeue(queue *q);
 void removeFromQueue(queue *q, int index);
 void clearQueue(queue *q);
@@ -103,6 +116,7 @@ int isQueueEmpty(queue *q);
 void selectiveState();
 void *timeout(void *args);
 void *selectiveTimeout(void *args);
+void pTimestamp();
 
 // void incrementSeq(TransmissionInfo *transmissionInfo);
 // int getSeq(TransmissionInfo *transmissionInfo);
